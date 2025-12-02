@@ -11,10 +11,21 @@ export default function Cierre() {
   // Calculate totals by Method
   const methods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Bancolombia', 'Otro'];
   
+  // Get accounts by payment method
+  const accountsByMethod: { [key in PaymentMethod]?: number } = {
+    'Efectivo': accounts.find(a => a.name.toLowerCase().includes('efectivo'))?.initialBalance || 0,
+    'Nequi': accounts.find(a => a.name.toLowerCase().includes('nequi'))?.initialBalance || 0,
+    'Bancolombia': accounts.find(a => a.name.toLowerCase().includes('bancolombia'))?.initialBalance || 0,
+    'Otro': accounts.find(a => a.name.toLowerCase().includes('otro') || (!a.name.toLowerCase().includes('efectivo') && !a.name.toLowerCase().includes('nequi') && !a.name.toLowerCase().includes('bancolombia')))?.initialBalance || 0,
+  };
+  
   const statsByMethod = methods.map(method => {
-    const income = transactions
+    const transactionIncome = transactions
       .filter(t => t.type === 'ingreso' && t.method === method)
       .reduce((sum, t) => sum + t.amount, 0);
+    
+    const accountBalance = accountsByMethod[method] || 0;
+    const income = transactionIncome + accountBalance;
       
     const expense = transactions
       .filter(t => t.type === 'egreso' && t.method === method)
@@ -30,8 +41,7 @@ export default function Cierre() {
 
   const totalIncome = statsByMethod.reduce((acc, curr) => acc + curr.income, 0);
   const totalExpense = statsByMethod.reduce((acc, curr) => acc + curr.expense, 0);
-  const totalInitialBalance = accounts.reduce((acc, curr) => acc + curr.initialBalance, 0);
-  const totalBalance = totalInitialBalance + totalIncome - totalExpense;
+  const totalBalance = totalIncome - totalExpense;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -49,20 +59,7 @@ export default function Cierre() {
       </div>
 
       {/* Grand Totals */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-gradient-to-br from-blue-600 to-cyan-700 text-white border-none shadow-lg">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-blue-100 flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              Base Inicial
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono">{formatCurrency(totalInitialBalance)}</div>
-            <p className="text-xs text-blue-200 mt-1">Saldos base de cuentas</p>
-          </CardContent>
-        </Card>
-
+      <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-gradient-to-br from-indigo-600 to-violet-700 text-white border-none shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-indigo-100 flex items-center gap-2">
@@ -72,7 +69,7 @@ export default function Cierre() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold font-mono">{formatCurrency(totalBalance)}</div>
-            <p className="text-xs text-indigo-200 mt-1">Base + Ingresos - Egresos</p>
+            <p className="text-xs text-indigo-200 mt-1">Ingresos + Cuentas - Egresos</p>
           </CardContent>
         </Card>
         
