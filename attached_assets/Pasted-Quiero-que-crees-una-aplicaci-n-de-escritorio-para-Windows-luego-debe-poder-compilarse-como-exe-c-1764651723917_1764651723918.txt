@@ -1,0 +1,153 @@
+Quiero que crees una aplicación de escritorio para Windows (luego debe poder compilarse como .exe) con las siguientes características:
+
+1. General
+
+Tecnologías: Python 3 + PyQt5 o PySide6 + SQLite.
+
+La app debe funcionar sin internet, completamente local.
+
+Toda la estructura del proyecto debe quedar organizada en carpetas.
+
+Entregar el código listo para compilar con PyInstaller (modo carpeta / folder).
+
+2. Nombre
+
+El nombre de la aplicación debe ser:
+Finanzas Pro
+
+3. Funciones obligatorias
+a) Login
+
+Pantalla inicial con contraseña.
+
+La contraseña se guarda en SQLite (tabla usuarios).
+
+Contraseña por defecto: 1234.
+
+Permitir cambiar contraseña más adelante (opcional).
+
+b) Módulo de Ingresos
+
+Cada ingreso debe tener:
+
+Monto
+
+Método de pago: Efectivo, Nequi, Bancolombia, Otro
+
+Descripción (qué se vendió)
+
+Fecha
+
+Cuenta asociada
+
+Botón para editar y eliminar ingresos
+
+Guardar todo en la base de datos SQLite (tabla movimientos)
+
+Tipo: Ingreso
+
+c) Módulo de Egresos
+
+Debe incluir:
+
+Monto
+
+Método de pago
+
+Descripción
+
+Fecha
+
+Cuenta asociada
+
+Botón para editar y eliminar egresos
+
+Tipo: Egreso
+
+d) Módulo de Cuentas
+
+Crear cuentas (ejemplo: Caja mayor, Nequi, Bancolombia…).
+
+A cada cuenta se le puede poner saldo inicial.
+
+Los ingresos deben sumar, los egresos deben restar automáticamente.
+
+Mostrar nombre + saldo.
+
+Guardar cuentas en la tabla “cuentas”.
+
+e) Módulo de Balance
+
+Debe mostrar:
+
+Total ingresos
+
+Total egresos
+
+Balance general
+
+Saldos de cada cuenta
+
+Gráfico de barras o circular (matplotlib)
+
+4. Base de datos
+
+Base de datos SQLite con tablas:
+
+usuarios (id, password)
+cuentas (id, nombre, saldo)
+movimientos (id, tipo, monto, metodo, descripcion, cuenta_id, fecha)
+
+La app debe:
+
+Crear la base si no existe
+
+Manejar errores de conexión
+
+Actualizar el saldo de la cuenta cuando se registra o edita un movimiento
+
+5. Interfaz (GUI)
+
+Estilo moderno fintech:
+
+Colores claros
+
+Bordes redondeados
+
+Tarjetas
+
+Íconos
+
+Tipografías limpias (p. ej. Segoe UI)
+
+Navegación por tabs: Ingresos, Egresos, Cuentas, Balance
+
+Diseño agradable, profesional y fácil de usar
+
+6. Estructura del proyecto
+
+Crear una estructura así:
+
+FinanzasPro/
+    main.py
+    ui/
+        login.py
+        main_window.py
+        ingresos.py
+        egresos.py
+        cuentas.py
+        balance.py
+    database/
+        db.py
+        finanzas.db   (se crea automático)
+    assets/
+        icon.ico
+        logo.png
+    README.md
+    compilar.bat
+
+7. Compilación a .exe
+
+Generar un archivo compilar.bat con:
+
+pyinstaller --noconfirm --windowed --icon=assets/icon.ico --name "FinanzasPro" main.py
