@@ -19,7 +19,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Ba
 
 const transactionSchema = z.object({
   amount: z.coerce.number().min(1, "El monto debe ser mayor a 0"),
-  method: z.enum(['Caja Mayor', 'Caja Menor', 'Nequi', 'Bold']),
+  method: z.enum(['Efectivo', 'Nequi', 'Daviplata', 'Bolt']),
   description: z.string().min(2, "Descripción requerida"),
   accountId: z.string().min(1, "Seleccione una cuenta"),
   date: z.date(),
@@ -56,7 +56,7 @@ export default function Movements({ type }: MovementsPageProps) {
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       amount: 0,
-      method: 'Caja Mayor',
+      method: 'Efectivo',
       description: "",
       accountId: "",
       date: new Date(),
@@ -83,7 +83,7 @@ export default function Movements({ type }: MovementsPageProps) {
     setEditingId(null);
     form.reset({
       amount: 0,
-      method: 'Caja Mayor',
+      method: 'Efectivo',
       description: "",
       accountId: "",
       date: new Date(),
@@ -106,7 +106,7 @@ export default function Movements({ type }: MovementsPageProps) {
     setEditingId(null);
     form.reset({
       amount: 0,
-      method: 'Caja Mayor',
+      method: 'Efectivo',
       description: "",
       accountId: "",
       date: new Date(),
@@ -293,10 +293,10 @@ export default function Movements({ type }: MovementsPageProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Caja Mayor">Caja Mayor</SelectItem>
-                          <SelectItem value="Caja Menor">Caja Menor</SelectItem>
+                          <SelectItem value="Efectivo">Efectivo</SelectItem>
                           <SelectItem value="Nequi">Nequi</SelectItem>
-                          <SelectItem value="Bold">Bold</SelectItem>
+                          <SelectItem value="Daviplata">Daviplata</SelectItem>
+                          <SelectItem value="Bolt">Bolt</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

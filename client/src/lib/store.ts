@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { nanoid } from 'nanoid';
 
 export type TransactionType = 'ingreso' | 'egreso';
-export type PaymentMethod = 'Caja Mayor' | 'Caja Menor' | 'Nequi' | 'Bold';
+export type PaymentMethod = 'Efectivo' | 'Nequi' | 'Daviplata' | 'Bolt';
 
 export interface Account {
   id: string;

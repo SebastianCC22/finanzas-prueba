@@ -9,14 +9,14 @@ export default function Cierre() {
   const accounts = getStoreAccounts();
 
   // Calculate totals by Method
-  const methods: PaymentMethod[] = ['Caja Mayor', 'Caja Menor', 'Nequi', 'Bold'];
+  const methods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Bolt'];
   
   // Get accounts by payment method
   const accountsByMethod: { [key in PaymentMethod]?: number } = {
-    'Caja Mayor': accounts.find(a => a.name.toLowerCase().includes('caja mayor'))?.initialBalance || 0,
-    'Caja Menor': accounts.find(a => a.name.toLowerCase().includes('caja menor'))?.initialBalance || 0,
+    'Efectivo': accounts.find(a => a.name.toLowerCase().includes('efectivo'))?.initialBalance || 0,
     'Nequi': accounts.find(a => a.name.toLowerCase().includes('nequi'))?.initialBalance || 0,
-    'Bold': accounts.find(a => a.name.toLowerCase().includes('bold'))?.initialBalance || 0,
+    'Daviplata': accounts.find(a => a.name.toLowerCase().includes('daviplata'))?.initialBalance || 0,
+    'Bolt': accounts.find(a => a.name.toLowerCase().includes('bolt'))?.initialBalance || 0,
   };
   
   const statsByMethod = methods.map(method => {
@@ -108,14 +108,16 @@ export default function Cierre() {
               <div key={stat.method} className="border rounded-xl p-4 bg-card hover:bg-accent/5 transition-colors relative overflow-hidden">
                 <div className={cn(
                   "absolute top-0 right-0 w-24 h-24 -mr-6 -mt-6 rounded-full opacity-5 pointer-events-none",
-                  stat.method === 'Caja Mayor' ? 'bg-blue-500' : 
-                  stat.method === 'Caja Menor' ? 'bg-green-500' : 
-                  stat.method === 'Nequi' ? 'bg-purple-500' : 'bg-orange-500'
+                  stat.method === 'Efectivo' ? 'bg-green-500' : 
+                  stat.method === 'Nequi' ? 'bg-purple-500' : 
+                  stat.method === 'Daviplata' ? 'bg-red-500' : 'bg-orange-500'
                 )} />
                 
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  {stat.method === 'Caja Mayor' && <Wallet className="h-4 w-4 text-blue-600" />}
-                  {stat.method === 'Caja Menor' && <Wallet className="h-4 w-4 text-green-600" />}
+                  {stat.method === 'Efectivo' && <Wallet className="h-4 w-4 text-green-600" />}
+                  {stat.method === 'Nequi' && <Wallet className="h-4 w-4 text-purple-600" />}
+                  {stat.method === 'Daviplata' && <Wallet className="h-4 w-4 text-red-600" />}
+                  {stat.method === 'Bolt' && <Wallet className="h-4 w-4 text-orange-600" />}
                   {stat.method}
                 </h3>
                 
