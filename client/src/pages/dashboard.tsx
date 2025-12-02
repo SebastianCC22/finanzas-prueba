@@ -181,31 +181,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Relación Ingreso vs Egreso vs Balance */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Resumen Financiero</CardTitle>
-            <CardDescription>Comparativa general</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={balanceStats}>
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    formatter={(value: number) => formatCurrency(value)}
-                    cursor={{ fill: 'transparent' }}
-                  />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]} >
-                    {balanceStats.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
