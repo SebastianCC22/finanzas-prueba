@@ -1,6 +1,6 @@
 import { useStore, PaymentMethod } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowDownCircle, ArrowUpCircle, Wallet, Calculator, CheckCircle2 } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Wallet, Calculator, CheckCircle2, Banknote, PiggyBank } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Cierre() {
@@ -42,6 +42,28 @@ export default function Cierre() {
   const totalIncome = statsByMethod.reduce((acc, curr) => acc + curr.income, 0);
   const totalExpense = statsByMethod.reduce((acc, curr) => acc + curr.expense, 0);
   const totalBalance = totalIncome - totalExpense;
+
+  // Calculate Caja Mayor stats
+  const cajaMayorAccount = accounts.find(a => a.name === "Caja Mayor");
+  const cajaMayorBase = cajaMayorAccount?.initialBalance || 0;
+  const cajaMayorIngresos = cajaMayorAccount 
+    ? transactions.filter(t => t.type === 'ingreso' && t.accountId === cajaMayorAccount.id).reduce((sum, t) => sum + t.amount, 0)
+    : 0;
+  const cajaMayorEgresos = cajaMayorAccount 
+    ? transactions.filter(t => t.type === 'egreso' && t.accountId === cajaMayorAccount.id).reduce((sum, t) => sum + t.amount, 0)
+    : 0;
+  const cajaMayorSaldo = cajaMayorBase + cajaMayorIngresos - cajaMayorEgresos;
+
+  // Calculate Caja Menor stats
+  const cajaMenorAccount = accounts.find(a => a.name === "Caja Menor");
+  const cajaMenorBase = cajaMenorAccount?.initialBalance || 0;
+  const cajaMenorIngresos = cajaMenorAccount 
+    ? transactions.filter(t => t.type === 'ingreso' && t.accountId === cajaMenorAccount.id).reduce((sum, t) => sum + t.amount, 0)
+    : 0;
+  const cajaMenorEgresos = cajaMenorAccount 
+    ? transactions.filter(t => t.type === 'egreso' && t.accountId === cajaMenorAccount.id).reduce((sum, t) => sum + t.amount, 0)
+    : 0;
+  const cajaMenorSaldo = cajaMenorBase + cajaMenorIngresos - cajaMenorEgresos;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -95,6 +117,79 @@ export default function Cierre() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Caja Mayor y Caja Menor */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Saldo de Cajas</CardTitle>
+          <CardDescription>Estado actual de Caja Mayor y Caja Menor</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Caja Mayor */}
+            <div className="border rounded-xl p-5 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full bg-blue-500 opacity-10 pointer-events-none" />
+              
+              <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                <Banknote className="h-5 w-5" />
+                Caja Mayor
+              </h3>
+              
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Base Inicial</span>
+                  <span className="font-mono font-medium">{formatCurrency(cajaMayorBase)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Ingresos Guardados</span>
+                  <span className="font-mono text-emerald-600 font-medium">+{formatCurrency(cajaMayorIngresos)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Egresos Realizados</span>
+                  <span className="font-mono text-rose-600 font-medium">-{formatCurrency(cajaMayorEgresos)}</span>
+                </div>
+                <div className="pt-3 border-t border-blue-200 dark:border-blue-800 mt-2 flex justify-between items-center font-bold">
+                  <span>Saldo Final</span>
+                  <span className={cn("font-mono text-xl", cajaMayorSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-rose-600")}>
+                    {formatCurrency(cajaMayorSaldo)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Caja Menor */}
+            <div className="border rounded-xl p-5 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full bg-amber-500 opacity-10 pointer-events-none" />
+              
+              <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <PiggyBank className="h-5 w-5" />
+                Caja Menor
+              </h3>
+              
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Base Inicial</span>
+                  <span className="font-mono font-medium">{formatCurrency(cajaMenorBase)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Ingresos Guardados</span>
+                  <span className="font-mono text-emerald-600 font-medium">+{formatCurrency(cajaMenorIngresos)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Egresos Realizados</span>
+                  <span className="font-mono text-rose-600 font-medium">-{formatCurrency(cajaMenorEgresos)}</span>
+                </div>
+                <div className="pt-3 border-t border-amber-200 dark:border-amber-800 mt-2 flex justify-between items-center font-bold">
+                  <span>Saldo Final</span>
+                  <span className={cn("font-mono text-xl", cajaMenorSaldo >= 0 ? "text-amber-700 dark:text-amber-400" : "text-rose-600")}>
+                    {formatCurrency(cajaMenorSaldo)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Detailed Breakdown */}
       <Card>
