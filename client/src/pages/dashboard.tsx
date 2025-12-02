@@ -71,59 +71,11 @@ export default function Dashboard() {
         </a>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-gradient-to-br from-sidebar-primary to-blue-600 text-white border-none shadow-lg shadow-blue-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-100">
-              Balance Total
-            </CardTitle>
-            <Wallet className="h-4 w-4 text-blue-100" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold font-mono tracking-tight">{formatCurrency(realTotalBalance)}</div>
-            <p className="text-xs text-blue-200 mt-1">
-              Total en cuentas activas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ingresos Totales
-            </CardTitle>
-            <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-emerald-600">+{formatCurrency(totalIncome)}</div>
-            <div className="flex items-center text-xs text-emerald-600 mt-1">
-              <TrendingUp className="h-3 w-3 mr-1" /> Recaudado
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Egresos Totales
-            </CardTitle>
-            <ArrowDownCircle className="h-4 w-4 text-rose-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-rose-600">-{formatCurrency(totalExpense)}</div>
-            <div className="flex items-center text-xs text-rose-600 mt-1">
-              <TrendingDown className="h-3 w-3 mr-1" /> Gastado
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Charts Section */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         
         {/* Distribución de Saldos */}
-        <Card className="lg:col-span-1">
+        <Card>
           <CardHeader>
             <CardTitle>Distribución de Saldos</CardTitle>
             <CardDescription>Dinero en cada cuenta</CardDescription>
@@ -147,7 +99,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Ingresos por Método */}
-        <Card className="lg:col-span-1">
+        <Card>
           <CardHeader>
             <CardTitle>Ingresos por Método</CardTitle>
             <CardDescription>Entradas por canal de pago</CardDescription>
@@ -177,32 +129,6 @@ export default function Dashboard() {
               ) : (
                 <div className="text-muted-foreground text-sm">No hay datos de ingresos</div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Relación Ingreso vs Egreso vs Balance */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Resumen Financiero</CardTitle>
-            <CardDescription>Comparativa general</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={balanceStats}>
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    formatter={(value: number) => formatCurrency(value)}
-                    cursor={{ fill: 'transparent' }}
-                  />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]} >
-                    {balanceStats.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
