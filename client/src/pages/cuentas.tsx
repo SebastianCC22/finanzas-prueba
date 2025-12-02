@@ -19,7 +19,8 @@ const accountSchema = z.object({
 });
 
 export default function Cuentas() {
-  const { accounts, addAccount, updateAccount } = useStore();
+  const { getStoreAccounts, addAccount, updateAccount } = useStore();
+  const accounts = getStoreAccounts();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 

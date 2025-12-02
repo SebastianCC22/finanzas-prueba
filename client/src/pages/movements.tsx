@@ -30,7 +30,9 @@ interface MovementsPageProps {
 }
 
 export default function Movements({ type }: MovementsPageProps) {
-  const { transactions, accounts, addTransaction, updateTransaction, deleteTransaction } = useStore();
+  const { getStoreTransactions, getStoreAccounts, addTransaction, updateTransaction, deleteTransaction } = useStore();
+  const transactions = getStoreTransactions();
+  const accounts = getStoreAccounts();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   

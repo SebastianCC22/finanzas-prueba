@@ -8,7 +8,9 @@ import {
   Wallet, 
   LogOut, 
   Menu,
-  Store
+  Store,
+  LockOpen,
+  Calculator
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,8 +23,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/", label: "Inicio", icon: LayoutDashboard },
+    { href: "/apertura", label: "Apertura", icon: LockOpen },
     { href: "/ingresos", label: "Ingresos", icon: ArrowUpCircle },
     { href: "/egresos", label: "Egresos", icon: ArrowDownCircle },
+    { href: "/cierre", label: "Cierre", icon: Calculator },
     { href: "/cuentas", label: "Cuentas", icon: Wallet },
   ];
 

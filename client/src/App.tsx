@@ -8,6 +8,8 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Movements from "@/pages/movements";
 import Cuentas from "@/pages/cuentas";
+import Apertura from "@/pages/apertura";
+import Cierre from "@/pages/cierre";
 import Layout from "@/components/layout";
 import NotFound from "@/pages/not-found";
 
@@ -60,6 +62,14 @@ function Router() {
       
       <Route path="/cuentas">
         {() => <PrivateRoute component={Cuentas} />}
+      </Route>
+      
+      <Route path="/apertura">
+        {() => <PrivateRoute component={Apertura} />}
+      </Route>
+      
+      <Route path="/cierre">
+        {() => <PrivateRoute component={Cierre} />}
       </Route>
       
       <Route component={NotFound} />

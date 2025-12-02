@@ -7,6 +7,7 @@ export type PaymentMethod = 'Efectivo' | 'Nequi' | 'Bancolombia' | 'Otro';
 
 export interface Account {
   id: string;
+  storeId: string;
   name: string;
   initialBalance: number;
   currentBalance: number;
@@ -15,12 +16,21 @@ export interface Account {
 
 export interface Transaction {
   id: string;
+  storeId: string;
   type: TransactionType;
   amount: number;
   method: PaymentMethod;
   description: string;
   date: string;
   accountId: string;
+}
+
+export interface OpeningRecord {
+  id: string;
+  storeId: string;
+  date: string;
+  cajaMayor: number;
+  cajaMenor: number;
 }
 
 interface AppState {
@@ -30,23 +40,22 @@ interface AppState {
   logout: () => void;
   
   accounts: Account[];
+  getStoreAccounts: () => Account[];
   addAccount: (name: string, initialBalance: number, includeInTotal: boolean) => void;
   updateAccount: (id: string, name: string, initialBalance: number, includeInTotal: boolean) => void;
   
   transactions: Transaction[];
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
-  updateTransaction: (id: string, transaction: Partial<Omit<Transaction, 'id'>>) => void;
+  getStoreTransactions: () => Transaction[];
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'storeId'>) => void;
+  updateTransaction: (id: string, transaction: Partial<Omit<Transaction, 'id' | 'storeId'>>) => void;
   deleteTransaction: (id: string) => void;
+  
+  openings: OpeningRecord[];
+  getStoreOpenings: () => OpeningRecord[];
+  addOpening: (cajaMayor: number, cajaMenor: number) => void;
   
   reset: () => void;
 }
-
-// Initial Seed Data
-const INITIAL_ACCOUNTS: Account[] = [
-  { id: '1', name: 'Caja Mayor', initialBalance: 1000000, currentBalance: 1000000, includeInTotal: true },
-  { id: '2', name: 'Nequi', initialBalance: 50000, currentBalance: 50000, includeInTotal: true },
-  { id: '3', name: 'Bancolombia', initialBalance: 2500000, currentBalance: 2500000, includeInTotal: true },
-];
 
 export const useStore = create<AppState>()(
   persist(
@@ -59,10 +68,19 @@ export const useStore = create<AppState>()(
       },
       logout: () => set({ isAuthenticated: false, currentStore: null }),
       
-      accounts: INITIAL_ACCOUNTS,
+      accounts: [],
+      getStoreAccounts: () => {
+        const { accounts, currentStore } = get();
+        if (!currentStore) return [];
+        return accounts.filter(a => a.storeId === currentStore);
+      },
       addAccount: (name, initialBalance, includeInTotal) => {
-        const newAccount = {
+        const { currentStore } = get();
+        if (!currentStore) return;
+        
+        const newAccount: Account = {
           id: nanoid(),
+          storeId: currentStore,
           name,
           initialBalance,
           currentBalance: initialBalance,
@@ -95,8 +113,20 @@ export const useStore = create<AppState>()(
       },
       
       transactions: [],
+      getStoreTransactions: () => {
+        const { transactions, currentStore } = get();
+        if (!currentStore) return [];
+        return transactions.filter(t => t.storeId === currentStore);
+      },
       addTransaction: (transactionData) => {
-        const newTransaction = { ...transactionData, id: nanoid() };
+        const { currentStore } = get();
+        if (!currentStore) return;
+
+        const newTransaction: Transaction = { 
+          ...transactionData, 
+          id: nanoid(),
+          storeId: currentStore
+        };
         
         set((state) => {
           const updatedTransactions = [...state.transactions, newTransaction];
@@ -179,31 +209,30 @@ export const useStore = create<AppState>()(
         });
       },
       
-      reset: () => set({ accounts: INITIAL_ACCOUNTS, transactions: [], isAuthenticated: false, currentStore: null })
+      openings: [],
+      getStoreOpenings: () => {
+        const { openings, currentStore } = get();
+        if (!currentStore) return [];
+        return openings.filter(o => o.storeId === currentStore).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      },
+      addOpening: (cajaMayor, cajaMenor) => {
+         const { currentStore } = get();
+         if (!currentStore) return;
+         
+         const newOpening: OpeningRecord = {
+           id: nanoid(),
+           storeId: currentStore,
+           date: new Date().toISOString(),
+           cajaMayor,
+           cajaMenor
+         };
+         set(state => ({ openings: [newOpening, ...state.openings] }));
+      },
+
+      reset: () => set({ accounts: [], transactions: [], openings: [], isAuthenticated: false, currentStore: null })
     }),
     {
-      name: 'finanzas-pro-storage-v2', // Changed version to force reset or separate storage
-      storage: {
-        getItem: (name) => {
-          // Custom storage logic to handle multi-store: Prefix key with store name if logged in
-          // But we can't easily access state here. 
-          // Simpler approach: The store object holds ALL data, but we filter by "currentStore" property if we were real backend.
-          // Since this is frontend mockup, we will just use one storage for now but separate by key if requested.
-          // For the user request: "que en un computador pueda ejecutarse desde la tienda del 20 y otra desde el tunal sin que hayan conflictos"
-          // The best way in local storage is different keys.
-          
-          // HACK: Check URL or global var? No.
-          // Let's stick to single storage for mockup simplicity but logic inside handles "currentStore" separation?
-          // User wants independent execution.
-          // Let's just use localStorage normally. To support "independent", they would open different browsers or incognito.
-          // OR we namespace the key based on login? 
-          // We can't dynamic namespace the persist middleware easily after creation.
-          // Let's assume single browser instance = one store for this prototype.
-          return localStorage.getItem(name);
-        },
-        setItem: (name, value) => localStorage.setItem(name, value),
-        removeItem: (name) => localStorage.removeItem(name),
-      }
+      name: 'finanzas-pro-storage-v3', // Version bump for new schema
     }
   )
 );

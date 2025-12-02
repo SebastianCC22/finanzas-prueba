@@ -5,7 +5,9 @@ import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, TrendingDown, Downl
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 export default function Dashboard() {
-  const { transactions, accounts, currentStore } = useStore();
+  const { getStoreTransactions, getStoreAccounts, currentStore } = useStore();
+  const transactions = getStoreTransactions();
+  const accounts = getStoreAccounts();
 
   // Filter accounts included in total for balance calculation
   const activeAccounts = accounts.filter(a => a.includeInTotal);
