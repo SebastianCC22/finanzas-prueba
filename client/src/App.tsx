@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { useStore } from "@/lib/store";
+import { useEffect } from "react";
 
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -78,6 +79,23 @@ function Router() {
 }
 
 function App() {
+  const checkAndResetDaily = useStore((state) => state.checkAndResetDaily);
+  const isAuthenticated = useStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Check and reset on app load
+      checkAndResetDaily();
+      
+      // Check every minute if we need to reset
+      const interval = setInterval(() => {
+        checkAndResetDaily();
+      }, 60000); // Check every minute
+      
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, checkAndResetDaily]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Router />

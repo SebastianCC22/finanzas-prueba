@@ -39,6 +39,8 @@ interface AppState {
   login: (storeName: string) => boolean;
   logout: () => void;
   
+  lastResetDate: string | null;
+  
   accounts: Account[];
   getStoreAccounts: () => Account[];
   addAccount: (name: string, initialBalance: number, includeInTotal: boolean) => void;
@@ -50,6 +52,8 @@ interface AppState {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'storeId'>) => void;
   updateTransaction: (id: string, transaction: Partial<Omit<Transaction, 'id' | 'storeId'>>) => void;
   deleteTransaction: (id: string) => void;
+  resetDailyTransactions: () => void;
+  checkAndResetDaily: () => void;
   
   openings: OpeningRecord[];
   getStoreOpenings: () => OpeningRecord[];
@@ -63,6 +67,7 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       isAuthenticated: false,
       currentStore: null,
+      lastResetDate: null,
       login: (storeName) => {
         set({ isAuthenticated: true, currentStore: storeName });
         return true;
@@ -220,6 +225,31 @@ export const useStore = create<AppState>()(
           };
         });
       },
+      resetDailyTransactions: () => {
+        set((state) => {
+          const today = new Date().toISOString().split('T')[0];
+          
+          // Reset account balances to their initial balances
+          const updatedAccounts = state.accounts.map(acc => ({
+            ...acc,
+            currentBalance: acc.initialBalance
+          }));
+          
+          return {
+            transactions: [],
+            accounts: updatedAccounts,
+            lastResetDate: today
+          };
+        });
+      },
+      checkAndResetDaily: () => {
+        const today = new Date().toISOString().split('T')[0];
+        const { lastResetDate } = get();
+        
+        if (lastResetDate !== today) {
+          get().resetDailyTransactions();
+        }
+      },
       
       openings: [],
       getStoreOpenings: () => {
@@ -241,7 +271,7 @@ export const useStore = create<AppState>()(
          set(state => ({ openings: [newOpening, ...state.openings] }));
       },
 
-      reset: () => set({ accounts: [], transactions: [], openings: [], isAuthenticated: false, currentStore: null })
+      reset: () => set({ accounts: [], transactions: [], openings: [], isAuthenticated: false, currentStore: null, lastResetDate: null })
     }),
     {
       name: 'finanzas-pro-storage-v3', // Version bump for new schema
