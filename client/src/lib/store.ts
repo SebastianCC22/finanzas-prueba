@@ -31,6 +31,8 @@ export interface OpeningRecord {
   date: string;
   cajaMayor: number;
   cajaMenor: number;
+  totalIncome?: number;
+  totalExpense?: number;
 }
 
 interface AppState {
@@ -258,17 +260,46 @@ export const useStore = create<AppState>()(
         return openings.filter(o => o.storeId === currentStore).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       },
       addOpening: (cajaMayor, cajaMenor) => {
-         const { currentStore } = get();
+         const { currentStore, transactions } = get();
          if (!currentStore) return;
+         
+         // Calculate today's income and expenses
+         const storeTransactions = transactions.filter(t => t.storeId === currentStore);
+         const totalIncome = storeTransactions
+           .filter(t => t.type === 'ingreso')
+           .reduce((sum, t) => sum + t.amount, 0);
+         const totalExpense = storeTransactions
+           .filter(t => t.type === 'egreso')
+           .reduce((sum, t) => sum + t.amount, 0);
          
          const newOpening: OpeningRecord = {
            id: nanoid(),
            storeId: currentStore,
            date: new Date().toISOString(),
            cajaMayor,
-           cajaMenor
+           cajaMenor,
+           totalIncome,
+           totalExpense
          };
-         set(state => ({ openings: [newOpening, ...state.openings] }));
+         
+         // Add opening and reset today's transactions
+         set((state) => {
+           const updatedTransactions = state.transactions.filter(t => t.storeId !== currentStore);
+           const updatedAccounts = state.accounts.filter(a => a.storeId === currentStore).length > 0
+             ? state.accounts.map(acc => {
+                 if (acc.storeId === currentStore) {
+                   return { ...acc, currentBalance: acc.initialBalance };
+                 }
+                 return acc;
+               })
+             : state.accounts;
+           
+           return {
+             openings: [newOpening, ...state.openings],
+             transactions: [...updatedTransactions, ...state.transactions.filter(t => t.storeId !== currentStore)],
+             accounts: updatedAccounts
+           };
+         });
       },
 
       reset: () => set({ accounts: [], transactions: [], openings: [], isAuthenticated: false, currentStore: null, lastResetDate: null })
