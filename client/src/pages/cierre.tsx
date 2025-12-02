@@ -4,8 +4,9 @@ import { ArrowDownCircle, ArrowUpCircle, Wallet, Calculator, CheckCircle2 } from
 import { cn } from "@/lib/utils";
 
 export default function Cierre() {
-  const { getStoreTransactions } = useStore();
+  const { getStoreTransactions, getStoreAccounts } = useStore();
   const transactions = getStoreTransactions();
+  const accounts = getStoreAccounts();
 
   // Calculate totals by Method
   const methods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Bancolombia', 'Otro'];
@@ -29,7 +30,8 @@ export default function Cierre() {
 
   const totalIncome = statsByMethod.reduce((acc, curr) => acc + curr.income, 0);
   const totalExpense = statsByMethod.reduce((acc, curr) => acc + curr.expense, 0);
-  const totalBalance = totalIncome - totalExpense;
+  const totalInitialBalance = accounts.reduce((acc, curr) => acc + curr.initialBalance, 0);
+  const totalBalance = totalInitialBalance + totalIncome - totalExpense;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -47,7 +49,20 @@ export default function Cierre() {
       </div>
 
       {/* Grand Totals */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="bg-gradient-to-br from-blue-600 to-cyan-700 text-white border-none shadow-lg">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-blue-100 flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Base Inicial
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono">{formatCurrency(totalInitialBalance)}</div>
+            <p className="text-xs text-blue-200 mt-1">Saldos base de cuentas</p>
+          </CardContent>
+        </Card>
+
         <Card className="bg-gradient-to-br from-indigo-600 to-violet-700 text-white border-none shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-indigo-100 flex items-center gap-2">
@@ -57,14 +72,14 @@ export default function Cierre() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold font-mono">{formatCurrency(totalBalance)}</div>
-            <p className="text-xs text-indigo-200 mt-1">Ingresos - Egresos (Global)</p>
+            <p className="text-xs text-indigo-200 mt-1">Base + Ingresos - Egresos</p>
           </CardContent>
         </Card>
         
         <Card>
            <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <ArrowUpCircle className="h-4 w-4 text-emerald-500" /> Total Ventas (Ingresos)
+              <ArrowUpCircle className="h-4 w-4 text-emerald-500" /> Total Ventas
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -75,7 +90,7 @@ export default function Cierre() {
         <Card>
            <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <ArrowDownCircle className="h-4 w-4 text-rose-500" /> Total Gastos (Egresos)
+              <ArrowDownCircle className="h-4 w-4 text-rose-500" /> Total Gastos
             </CardTitle>
           </CardHeader>
           <CardContent>
