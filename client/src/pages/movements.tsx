@@ -30,19 +30,21 @@ interface MovementsPageProps {
 }
 
 export default function Movements({ type }: MovementsPageProps) {
-  const { getStoreTransactions, getStoreAccounts, addTransaction, updateTransaction, deleteTransaction } = useStore();
-  const transactions = getStoreTransactions();
+  const { getStoreTransactions, getTodayTransactions, getStoreAccounts, addTransaction, updateTransaction, deleteTransaction } = useStore();
+  const allTransactions = getStoreTransactions();
+  const todayTransactions = getTodayTransactions();
   const accounts = getStoreAccounts();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
   const isIncome = type === 'ingreso';
-  const filteredTransactions = transactions.filter(t => t.type === type);
+  const filteredTransactions = allTransactions.filter(t => t.type === type);
+  const todayFiltered = todayTransactions.filter(t => t.type === type);
   
-  // Stats Calculation
-  const totalAmount = filteredTransactions.reduce((sum, t) => sum + t.amount, 0);
+  // Stats Calculation - Only count today's transactions
+  const totalAmount = todayFiltered.reduce((sum, t) => sum + t.amount, 0);
   
-  const incomeByMethod = filteredTransactions.reduce((acc, t) => {
+  const incomeByMethod = todayFiltered.reduce((acc, t) => {
     acc[t.method] = (acc[t.method] || 0) + t.amount;
     return acc;
   }, {} as Record<string, number>);

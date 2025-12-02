@@ -132,15 +132,6 @@ export default function Apertura() {
                         <span className="font-mono font-medium">{formatCurrency(opening.cajaMenor)}</span>
                       </div>
                     </div>
-                    {(opening.totalIncome !== undefined || opening.totalExpense !== undefined) && (
-                      <div className="pt-2 border-t grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-muted-foreground block">Día Anterior</span>
-                          <span className="text-emerald-600 font-mono">+{formatCurrency(opening.totalIncome || 0)}</span>
-                          <span className="text-rose-600 font-mono block">-{formatCurrency(opening.totalExpense || 0)}</span>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))
               )}
