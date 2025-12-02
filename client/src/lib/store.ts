@@ -43,6 +43,7 @@ interface AppState {
   getStoreAccounts: () => Account[];
   addAccount: (name: string, initialBalance: number, includeInTotal: boolean) => void;
   updateAccount: (id: string, name: string, initialBalance: number, includeInTotal: boolean) => void;
+  deleteAccount: (id: string) => void;
   
   transactions: Transaction[];
   getStoreTransactions: () => Transaction[];
@@ -109,6 +110,17 @@ export const useStore = create<AppState>()(
           });
           
           return { accounts: updatedAccounts };
+        });
+      },
+      deleteAccount: (id) => {
+        set((state) => {
+          const updatedAccounts = state.accounts.filter(acc => acc.id !== id);
+          const updatedTransactions = state.transactions.filter(t => t.accountId !== id);
+          
+          return {
+            accounts: updatedAccounts,
+            transactions: updatedTransactions
+          };
         });
       },
       

@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Wallet, Plus, CreditCard, Pencil, Check, X } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Wallet, Plus, CreditCard, Pencil, Check, X, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,10 +20,11 @@ const accountSchema = z.object({
 });
 
 export default function Cuentas() {
-  const { getStoreAccounts, addAccount, updateAccount } = useStore();
+  const { getStoreAccounts, addAccount, updateAccount, deleteAccount } = useStore();
   const accounts = getStoreAccounts();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof accountSchema>>({
     resolver: zodResolver(accountSchema),
@@ -64,6 +66,11 @@ export default function Cuentas() {
     setIsDialogOpen(true);
   };
 
+  const handleDelete = (accountId: string) => {
+    deleteAccount(accountId);
+    setDeleteConfirmId(null);
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -97,9 +104,14 @@ export default function Cuentas() {
                   <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">Oculta</span>
                 )}
               </CardTitle>
-              <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground hover:text-primary" onClick={() => handleEdit(account)}>
-                <Pencil className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-1 -mr-2">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => handleEdit(account)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => setDeleteConfirmId(account.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="relative z-10">
               <div className="text-2xl font-bold font-mono tracking-tight">
@@ -185,6 +197,23 @@ export default function Cuentas() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar Cuenta</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres eliminar esta cuenta? Esta acción también eliminará todos los movimientos asociados a esta cuenta y no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} className="bg-red-600 hover:bg-red-700">
+              Eliminar
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
