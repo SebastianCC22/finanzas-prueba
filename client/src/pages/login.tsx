@@ -1,7 +1,5 @@
-import { useState } from "react";
 import { useLocation } from "wouter";
 import { useStore } from "@/lib/store";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Store, ShoppingBag } from "lucide-react";
 
@@ -11,7 +9,9 @@ export default function Login() {
 
   const handleLogin = (storeName: string) => {
     login(storeName);
-    setLocation("/");
+    // Use a timeout to allow state to update before navigation
+    // This helps prevent hook mismatch errors if re-renders happen
+    setTimeout(() => setLocation("/"), 0);
   };
 
   return (
@@ -24,31 +24,31 @@ export default function Login() {
             <Store className="h-8 w-8 text-primary-foreground" />
           </div>
           <div>
-            <CardTitle className="text-3xl font-bold tracking-tight mb-2">Finanzas Pro</CardTitle>
+            <CardTitle className="text-3xl font-bold tracking-tight mb-2">Finanzas Rincon Integral</CardTitle>
             <CardDescription className="text-lg">Seleccione la tienda para operar</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="pt-8 pb-8">
           <div className="grid md:grid-cols-2 gap-6">
             <button
-              onClick={() => handleLogin("Tienda Del 20 De Julio")}
+              onClick={() => handleLogin("20 de Julio")}
               className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-muted hover:border-primary/50 bg-card hover:bg-accent/5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
             >
               <div className="h-16 w-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <ShoppingBag className="h-8 w-8" />
               </div>
-              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">Tienda Del 20 De Julio</h3>
+              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">20 de Julio</h3>
               <p className="text-sm text-muted-foreground mt-2">Ingresar al panel</p>
             </button>
 
             <button
-              onClick={() => handleLogin("Tienda Del Tunal")}
+              onClick={() => handleLogin("Tunal")}
               className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-muted hover:border-primary/50 bg-card hover:bg-accent/5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
             >
               <div className="h-16 w-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <ShoppingBag className="h-8 w-8" />
               </div>
-              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">Tienda Del Tunal</h3>
+              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">Tunal</h3>
               <p className="text-sm text-muted-foreground mt-2">Ingresar al panel</p>
             </button>
           </div>

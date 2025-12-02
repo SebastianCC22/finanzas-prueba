@@ -31,10 +31,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex h-16 items-center px-6 border-b border-sidebar-border">
         <Link href="/">
           <div className="flex items-center gap-2 font-heading font-bold text-xl text-sidebar-primary cursor-pointer">
-            <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground">
-              FP
+            <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground text-sm">
+              FR
             </div>
-            <span className="text-sidebar-foreground">Finanzas Pro</span>
+            <span className="text-sidebar-foreground">Finanzas Rincon Integral</span>
           </div>
         </Link>
       </div>
@@ -100,9 +100,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 border-b bg-sidebar z-40 flex items-center px-4 justify-between">
         <div className="flex items-center gap-2 font-heading font-bold text-lg text-sidebar-foreground">
           <div className="h-7 w-7 rounded-md bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground text-xs">
-            FP
+            FR
           </div>
-          Finanzas Pro
+          Finanzas Rincon
         </div>
         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
           <SheetTrigger asChild>

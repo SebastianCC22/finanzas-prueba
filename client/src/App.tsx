@@ -17,6 +17,7 @@ function PrivateRoute({ component: Component, ...rest }: any) {
 
   if (!isAuthenticated) {
     // Redirect to login but return null to avoid rendering anything
+    // Use setTimeout to avoid "Rendered fewer hooks than expected" during state transitions
     setTimeout(() => setLocation("/login"), 0);
     return null;
   }
@@ -30,15 +31,19 @@ function PrivateRoute({ component: Component, ...rest }: any) {
 
 function Router() {
   const isAuthenticated = useStore((state) => state.isAuthenticated);
+  const [, setLocation] = useLocation();
   
   return (
     <Switch>
       <Route path="/login">
-        {isAuthenticated ? (() => {
-          const [, setLocation] = useLocation();
-          setTimeout(() => setLocation("/"), 0);
-          return null;
-        }) : Login}
+        {() => {
+           if (isAuthenticated) {
+             // Redirect if already authenticated
+             setTimeout(() => setLocation("/"), 0);
+             return null;
+           }
+           return <Login />;
+        }}
       </Route>
       
       <Route path="/">
