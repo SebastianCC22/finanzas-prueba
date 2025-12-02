@@ -120,16 +120,16 @@ export default function Dashboard() {
       </div>
 
       {/* Charts Section */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-2">
         
         {/* Distribución de Saldos */}
-        <Card className="lg:col-span-1">
+        <Card className="shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader>
-            <CardTitle>Distribución de Saldos</CardTitle>
+            <CardTitle className="text-lg">Distribución de Saldos</CardTitle>
             <CardDescription>Dinero en cada cuenta</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <div className="h-[300px] w-full">
+            <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={accounts} layout="vertical" margin={{left: 0}}>
                   <XAxis type="number" hide />
@@ -147,13 +147,13 @@ export default function Dashboard() {
         </Card>
 
         {/* Ingresos por Método */}
-        <Card className="lg:col-span-1">
+        <Card className="shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader>
-            <CardTitle>Ingresos por Método</CardTitle>
+            <CardTitle className="text-lg">Ingresos por Método</CardTitle>
             <CardDescription>Entradas por canal de pago</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] w-full flex items-center justify-center">
+            <div className="h-[400px] w-full flex items-center justify-center">
               {incomeData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
