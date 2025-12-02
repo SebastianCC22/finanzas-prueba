@@ -1,6 +1,7 @@
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, TrendingDown, Download, FileCode } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 export default function Dashboard() {
@@ -50,9 +51,18 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Balance General</h1>
-        <p className="text-muted-foreground mt-1">Resumen de tu actividad financiera</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Balance General</h1>
+          <p className="text-muted-foreground mt-1">Resumen de tu actividad financiera</p>
+        </div>
+        
+        <a href="/finanzas_pro_source.zip" download>
+          <Button variant="outline" className="gap-2 border-primary/20 text-primary hover:bg-primary/5">
+            <FileCode className="h-4 w-4" />
+            Descargar Código Python (.zip)
+          </Button>
+        </a>
       </div>
 
       {/* Summary Cards */}
