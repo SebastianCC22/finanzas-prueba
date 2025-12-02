@@ -9,14 +9,14 @@ export default function Cierre() {
   const accounts = getStoreAccounts();
 
   // Calculate totals by Method
-  const methods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Bancolombia', 'Otro'];
+  const methods: PaymentMethod[] = ['Caja Mayor', 'Caja Menor', 'Nequi', 'Bold'];
   
   // Get accounts by payment method
   const accountsByMethod: { [key in PaymentMethod]?: number } = {
-    'Efectivo': accounts.find(a => a.name.toLowerCase().includes('efectivo'))?.initialBalance || 0,
+    'Caja Mayor': accounts.find(a => a.name.toLowerCase().includes('caja mayor'))?.initialBalance || 0,
+    'Caja Menor': accounts.find(a => a.name.toLowerCase().includes('caja menor'))?.initialBalance || 0,
     'Nequi': accounts.find(a => a.name.toLowerCase().includes('nequi'))?.initialBalance || 0,
-    'Bancolombia': accounts.find(a => a.name.toLowerCase().includes('bancolombia'))?.initialBalance || 0,
-    'Otro': accounts.find(a => a.name.toLowerCase().includes('otro') || (!a.name.toLowerCase().includes('efectivo') && !a.name.toLowerCase().includes('nequi') && !a.name.toLowerCase().includes('bancolombia')))?.initialBalance || 0,
+    'Bold': accounts.find(a => a.name.toLowerCase().includes('bold'))?.initialBalance || 0,
   };
   
   const statsByMethod = methods.map(method => {
@@ -108,13 +108,14 @@ export default function Cierre() {
               <div key={stat.method} className="border rounded-xl p-4 bg-card hover:bg-accent/5 transition-colors relative overflow-hidden">
                 <div className={cn(
                   "absolute top-0 right-0 w-24 h-24 -mr-6 -mt-6 rounded-full opacity-5 pointer-events-none",
-                  stat.method === 'Efectivo' ? 'bg-green-500' : 
-                  stat.method === 'Nequi' ? 'bg-purple-500' : 
-                  stat.method === 'Bancolombia' ? 'bg-yellow-500' : 'bg-gray-500'
+                  stat.method === 'Caja Mayor' ? 'bg-blue-500' : 
+                  stat.method === 'Caja Menor' ? 'bg-green-500' : 
+                  stat.method === 'Nequi' ? 'bg-purple-500' : 'bg-orange-500'
                 )} />
                 
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  {stat.method === 'Efectivo' && <Wallet className="h-4 w-4 text-green-600" />}
+                  {stat.method === 'Caja Mayor' && <Wallet className="h-4 w-4 text-blue-600" />}
+                  {stat.method === 'Caja Menor' && <Wallet className="h-4 w-4 text-green-600" />}
                   {stat.method}
                 </h3>
                 
