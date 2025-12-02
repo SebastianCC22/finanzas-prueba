@@ -255,10 +255,34 @@ export const useStore = create<AppState>()(
            cajaMenor
          };
          
-         set(state => ({
-           openings: [newOpening, ...state.openings],
-           lastOpeningDate: openingTime
-         }));
+         set(state => {
+           // Update Caja Mayor and Caja Menor accounts with opening values
+           const updatedAccounts = state.accounts.map(acc => {
+             if (acc.storeId === currentStore) {
+               if (acc.name === "Caja Mayor") {
+                 return {
+                   ...acc,
+                   initialBalance: cajaMayor,
+                   currentBalance: cajaMayor
+                 };
+               }
+               if (acc.name === "Caja Menor") {
+                 return {
+                   ...acc,
+                   initialBalance: cajaMenor,
+                   currentBalance: cajaMenor
+                 };
+               }
+             }
+             return acc;
+           });
+           
+           return {
+             accounts: updatedAccounts,
+             openings: [newOpening, ...state.openings],
+             lastOpeningDate: openingTime
+           };
+         });
       },
 
       reset: () => set({ accounts: [], transactions: [], openings: [], isAuthenticated: false, currentStore: null, lastOpeningDate: null })
