@@ -1,60 +1,57 @@
 import { useState } from "react";
-import { useStore } from "@/lib/store";
 import { useLocation } from "wouter";
+import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Store, ShoppingBag } from "lucide-react";
 
 export default function Login() {
-  const [password, setPassword] = useState("");
   const login = useStore((state) => state.login);
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (login(password)) {
-      setLocation("/");
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Error de acceso",
-        description: "La contraseña es incorrecta. Intente con 1234.",
-      });
-    }
+  const handleLogin = (storeName: string) => {
+    login(storeName);
+    setLocation("/");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
       <div className="absolute inset-0 bg-grid-slate-200/60 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/30 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]" />
       
-      <Card className="w-full max-w-md relative z-10 shadow-xl border-border/50">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto h-12 w-12 rounded-xl bg-primary flex items-center justify-center mb-2 shadow-lg shadow-primary/30">
-            <Lock className="h-6 w-6 text-primary-foreground" />
+      <Card className="w-full max-w-2xl relative z-10 shadow-2xl border-border/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90">
+        <CardHeader className="text-center space-y-4 pb-8 border-b">
+          <div className="mx-auto h-16 w-16 rounded-2xl bg-primary flex items-center justify-center mb-2 shadow-lg shadow-primary/30">
+            <Store className="h-8 w-8 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">Bienvenido a Finanzas Pro</CardTitle>
-          <CardDescription>Ingrese su contraseña para continuar</CardDescription>
+          <div>
+            <CardTitle className="text-3xl font-bold tracking-tight mb-2">Finanzas Pro</CardTitle>
+            <CardDescription className="text-lg">Seleccione la tienda para operar</CardDescription>
+          </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                type="password"
-                placeholder="Contraseña (1234)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="text-center tracking-[0.5em] text-lg h-12 font-mono"
-                maxLength={4}
-                autoFocus
-              />
-            </div>
-            <Button type="submit" className="w-full h-11 text-base font-medium shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all">
-              Ingresar
-            </Button>
-          </form>
+        <CardContent className="pt-8 pb-8">
+          <div className="grid md:grid-cols-2 gap-6">
+            <button
+              onClick={() => handleLogin("Tienda Del 20 De Julio")}
+              className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-muted hover:border-primary/50 bg-card hover:bg-accent/5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+            >
+              <div className="h-16 w-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <ShoppingBag className="h-8 w-8" />
+              </div>
+              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">Tienda Del 20 De Julio</h3>
+              <p className="text-sm text-muted-foreground mt-2">Ingresar al panel</p>
+            </button>
+
+            <button
+              onClick={() => handleLogin("Tienda Del Tunal")}
+              className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-muted hover:border-primary/50 bg-card hover:bg-accent/5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+            >
+              <div className="h-16 w-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <ShoppingBag className="h-8 w-8" />
+              </div>
+              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">Tienda Del Tunal</h3>
+              <p className="text-sm text-muted-foreground mt-2">Ingresar al panel</p>
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -8,7 +8,7 @@ import {
   Wallet, 
   LogOut, 
   Menu,
-  X
+  Store
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,11 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const logout = useStore((state) => state.logout);
+  const { logout, currentStore } = useStore();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const navItems = [
-    { href: "/", label: "Balance", icon: LayoutDashboard },
+    { href: "/", label: "Inicio", icon: LayoutDashboard },
     { href: "/ingresos", label: "Ingresos", icon: ArrowUpCircle },
     { href: "/egresos", label: "Egresos", icon: ArrowDownCircle },
     { href: "/cuentas", label: "Cuentas", icon: Wallet },
@@ -38,8 +38,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </Link>
       </div>
+
+      {/* Store Badge in Sidebar */}
+      <div className="px-4 pt-4">
+        <div className="bg-sidebar-accent/50 rounded-lg p-3 border border-sidebar-border">
+          <div className="flex items-center gap-2 text-sidebar-foreground/70 text-xs uppercase font-semibold mb-1">
+            <Store className="h-3 w-3" />
+            Tienda Activa
+          </div>
+          <div className="text-sidebar-foreground font-medium truncate" title={currentStore || ''}>
+            {currentStore}
+          </div>
+        </div>
+      </div>
       
-      <div className="flex-1 px-3 py-4">
+      <div className="flex-1 px-3 py-2">
         <nav className="grid gap-1">
           {navItems.map((item) => {
             const isActive = location === item.href;
@@ -70,7 +83,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           onClick={() => logout()}
         >
           <LogOut className="h-4 w-4" />
-          Cerrar Sesión
+          Cambiar Tienda
         </Button>
       </div>
     </div>
