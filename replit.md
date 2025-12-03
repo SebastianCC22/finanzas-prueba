@@ -71,12 +71,24 @@ Preferred communication style: Simple, everyday language.
 - Database URL expected via environment variable
 
 **Data Models (Client-Side):**
-- **Accounts:** Categorized by type (cajas, nequi, bold, daviplata) and tier (mayor/menor), track balances
-- **Transactions:** Income/expense records with payment method, amount, description, date
-- **Transfers:** Movement of funds between accounts
-- **Products:** Inventory items with pricing, IVA status, supplier info
+- **Accounts:** 8 fixed accounts categorized by type (cajas, nequi, bold, daviplata) and tier (mayor/menor), track balances
+- **Transactions:** Income/expense records with payment method (Efectivo, Nequi, Daviplata, Bolt), amount, description, date, optional productId link
+- **Transfers:** Movement of funds between any of the 8 accounts with atomic validation
+- **Products:** Inventory items with name, price, IVA status, supplier, brand, quantity, presentation (unidad, jarabe, liquido, polvo, tabletas, capsulas, crema, otro), optional weight
 - **Openings:** Daily cash register opening balances
 - **Stores:** Multi-tenancy with "20 de Julio" and "Tunal" stores
+
+**Inventory Features:**
+- Password-protected access (admin password: 1234)
+- Full CRUD for products with extended fields
+- Filters by presentation, supplier, and brand
+- Search by name, brand, or supplier
+- IVA products highlighted in blue
+
+**Income Page Features:**
+- Product search with autocomplete
+- Auto-fill price and description when selecting product
+- Product linked to transactions for tracking
 
 ### Authentication and Authorization
 
