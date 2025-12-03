@@ -59,16 +59,26 @@ export default function Movements({ type }: MovementsPageProps) {
   const chartData = Object.entries(incomeByMethod).map(([name, value]) => ({ name, value }));
   const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
+  const normalizedProducts = useMemo(() => {
+    return products.map(p => ({
+      ...p,
+      brand: p.brand || '',
+      quantity: p.quantity ?? 1,
+      presentation: p.presentation || 'unidad',
+      weight: p.weight || '',
+    }));
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
-    if (!productSearch.trim()) return products.slice(0, 10);
+    if (!productSearch.trim()) return normalizedProducts.slice(0, 10);
     const search = productSearch.toLowerCase();
-    return products.filter(p => 
+    return normalizedProducts.filter(p => 
       p.name.toLowerCase().includes(search) ||
       p.brand.toLowerCase().includes(search) ||
       p.supplier.toLowerCase().includes(search) ||
       p.presentation.toLowerCase().includes(search)
     ).slice(0, 10);
-  }, [products, productSearch]);
+  }, [normalizedProducts, productSearch]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

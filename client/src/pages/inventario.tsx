@@ -63,16 +63,26 @@ export default function Inventario() {
     },
   });
 
-  const uniqueSuppliers = useMemo(() => {
-    return Array.from(new Set(products.map(p => p.supplier))).sort();
+  const normalizedProducts = useMemo(() => {
+    return products.map(p => ({
+      ...p,
+      brand: p.brand || '',
+      quantity: p.quantity ?? 1,
+      presentation: p.presentation || 'unidad',
+      weight: p.weight || '',
+    }));
   }, [products]);
+
+  const uniqueSuppliers = useMemo(() => {
+    return Array.from(new Set(normalizedProducts.map(p => p.supplier))).sort();
+  }, [normalizedProducts]);
 
   const uniqueBrands = useMemo(() => {
-    return Array.from(new Set(products.map(p => p.brand))).filter(Boolean).sort();
-  }, [products]);
+    return Array.from(new Set(normalizedProducts.map(p => p.brand))).filter(Boolean).sort();
+  }, [normalizedProducts]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
+    return normalizedProducts.filter(p => {
       const matchesSearch = !searchTerm || 
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         p.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -84,7 +94,7 @@ export default function Inventario() {
       
       return matchesSearch && matchesPresentation && matchesSupplier && matchesBrand;
     });
-  }, [products, searchTerm, filterPresentation, filterSupplier, filterBrand]);
+  }, [normalizedProducts, searchTerm, filterPresentation, filterSupplier, filterBrand]);
 
   const hasActiveFilters = filterPresentation !== "all" || filterSupplier !== "all" || filterBrand !== "all";
 
