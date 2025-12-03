@@ -10,6 +10,8 @@ import Movements from "@/pages/movements";
 import Cuentas from "@/pages/cuentas";
 import Apertura from "@/pages/apertura";
 import Cierre from "@/pages/cierre";
+import Transferencias from "@/pages/transferencias";
+import Inventario from "@/pages/inventario";
 import Layout from "@/components/layout";
 import NotFound from "@/pages/not-found";
 
@@ -18,8 +20,6 @@ function PrivateRoute({ component: Component, ...rest }: any) {
   const [, setLocation] = useLocation();
 
   if (!isAuthenticated) {
-    // Redirect to login but return null to avoid rendering anything
-    // Use setTimeout to avoid "Rendered fewer hooks than expected" during state transitions
     setTimeout(() => setLocation("/login"), 0);
     return null;
   }
@@ -40,7 +40,6 @@ function Router() {
       <Route path="/login">
         {() => {
            if (isAuthenticated) {
-             // Redirect if already authenticated
              setTimeout(() => setLocation("/"), 0);
              return null;
            }
@@ -70,6 +69,14 @@ function Router() {
       
       <Route path="/cierre">
         {() => <PrivateRoute component={Cierre} />}
+      </Route>
+      
+      <Route path="/transferencias">
+        {() => <PrivateRoute component={Transferencias} />}
+      </Route>
+      
+      <Route path="/inventario">
+        {() => <PrivateRoute component={Inventario} />}
       </Route>
       
       <Route component={NotFound} />

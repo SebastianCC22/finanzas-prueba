@@ -1,74 +1,82 @@
-import { useStore } from "@/lib/store";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useStore, ACCOUNT_CATEGORIES, AccountCategory } from "@/lib/store";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wallet, Plus, CreditCard, Pencil, Check, X, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Wallet, Pencil, ChevronDown, Banknote, Smartphone, CreditCard, DollarSign } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
 const accountSchema = z.object({
-  name: z.string().min(2, "El nombre es requerido"),
   initialBalance: z.coerce.number().min(0, "El saldo debe ser positivo"),
-  includeInTotal: z.boolean().default(true),
 });
 
+const categoryIcons: Record<AccountCategory, React.ReactNode> = {
+  cajas: <Banknote className="h-5 w-5" />,
+  nequi: <Smartphone className="h-5 w-5" />,
+  bold: <CreditCard className="h-5 w-5" />,
+  daviplata: <DollarSign className="h-5 w-5" />,
+};
+
+const categoryColors: Record<AccountCategory, string> = {
+  cajas: 'from-green-500 to-emerald-600',
+  nequi: 'from-purple-500 to-violet-600',
+  bold: 'from-orange-500 to-amber-600',
+  daviplata: 'from-red-500 to-rose-600',
+};
+
+const categoryBgColors: Record<AccountCategory, string> = {
+  cajas: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800',
+  nequi: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800',
+  bold: 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800',
+  daviplata: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800',
+};
+
 export default function Cuentas() {
-  const { getStoreAccounts, addAccount, updateAccount, deleteAccount } = useStore();
-  const accounts = getStoreAccounts();
+  const { getAccountsByCategory, updateAccountBalance } = useStore();
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
+    cajas: true,
+    nequi: false,
+    bold: false,
+    daviplata: false,
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingAccount, setEditingAccount] = useState<{ id: string; name: string } | null>(null);
 
   const form = useForm<z.infer<typeof accountSchema>>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
-      name: "",
       initialBalance: 0,
-      includeInTotal: true,
     },
   });
 
   function onSubmit(values: z.infer<typeof accountSchema>) {
-    if (editingId) {
-      updateAccount(editingId, values.name, values.initialBalance, values.includeInTotal);
-    } else {
-      addAccount(values.name, values.initialBalance, values.includeInTotal);
+    if (editingAccount) {
+      updateAccountBalance(editingAccount.id, values.initialBalance);
     }
     setIsDialogOpen(false);
-    setEditingId(null);
+    setEditingAccount(null);
     form.reset();
   }
 
-  const handleEdit = (account: any) => {
-    setEditingId(account.id);
+  const handleEdit = (account: { id: string; name: string; initialBalance: number }) => {
+    setEditingAccount({ id: account.id, name: account.name });
     form.reset({
-      name: account.name,
       initialBalance: account.initialBalance,
-      includeInTotal: account.includeInTotal,
     });
     setIsDialogOpen(true);
   };
 
-  const handleAddNew = () => {
-    setEditingId(null);
-    form.reset({
-      name: "",
-      initialBalance: 0,
-      includeInTotal: true,
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = (accountId: string) => {
-    deleteAccount(accountId);
-    setDeleteConfirmId(null);
+  const toggleCategory = (category: string) => {
+    setOpenCategories(prev => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
   };
 
   const formatCurrency = (value: number) => {
@@ -79,141 +87,120 @@ export default function Cuentas() {
     }).format(value);
   };
 
+  const getTotalByCategory = (category: AccountCategory) => {
+    const accounts = getAccountsByCategory(category);
+    return accounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Mis Cuentas</h1>
-          <p className="text-muted-foreground mt-1">Administra tus fuentes de dinero</p>
-        </div>
-        
-        <Button onClick={handleAddNew} className="gap-2 shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4" /> Nueva Cuenta
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Mis Cuentas</h1>
+        <p className="text-muted-foreground mt-1">Administra tus cajas por categoría</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {accounts.map((account) => (
-          <Card key={account.id} className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary group overflow-hidden relative">
-            <div className="absolute right-0 top-0 h-24 w-24 bg-primary/5 rounded-bl-full -mr-4 -mt-4 group-hover:bg-primary/10 transition-colors" />
-            
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-              <CardTitle className="text-lg font-medium flex items-center gap-2">
-                {account.name}
-                {!account.includeInTotal && (
-                  <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">Oculta</span>
-                )}
-              </CardTitle>
-              <div className="flex gap-1 -mr-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => handleEdit(account)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => setDeleteConfirmId(account.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="relative z-10">
-              <div className="text-2xl font-bold font-mono tracking-tight">
-                {formatCurrency(account.currentBalance)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 flex justify-between">
-                <span>Saldo disponible</span>
-                <span>Inicial: {formatCurrency(account.initialBalance)}</span>
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-
-        {accounts.length === 0 && (
-          <div className="col-span-full py-12 text-center bg-muted/30 rounded-xl border border-dashed border-muted-foreground/25">
-            <CreditCard className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-            <h3 className="text-lg font-medium">No hay cuentas registradas</h3>
-            <p className="text-muted-foreground text-sm max-w-sm mx-auto mt-1">
-              Crea tu primera cuenta para empezar a registrar movimientos.
-            </p>
-          </div>
-        )}
+      <div className="space-y-4">
+        {ACCOUNT_CATEGORIES.map((cat) => {
+          const accounts = getAccountsByCategory(cat.id);
+          const total = getTotalByCategory(cat.id);
+          const isOpen = openCategories[cat.id];
+          
+          return (
+            <Collapsible key={cat.id} open={isOpen} onOpenChange={() => toggleCategory(cat.id)}>
+              <Card className={cn("overflow-hidden transition-all", categoryBgColors[cat.id])}>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center text-white bg-gradient-to-br", categoryColors[cat.id])}>
+                          {categoryIcons[cat.id]}
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{cat.label}</CardTitle>
+                          <p className="text-sm text-muted-foreground">
+                            Total: <span className="font-mono font-medium">{formatCurrency(total)}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                
+                <CollapsibleContent>
+                  <CardContent className="pt-0 pb-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {accounts.map((account) => (
+                        <div 
+                          key={account.id} 
+                          className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-gray-900/50 border shadow-sm"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
+                              <Wallet className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{account.tier === 'mayor' ? 'Caja Mayor' : 'Caja Menor'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Base: {formatCurrency(account.initialBalance)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right">
+                              <p className="font-mono font-bold text-lg">{formatCurrency(account.currentBalance)}</p>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-muted-foreground hover:text-primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(account);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          );
+        })}
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Cuenta' : 'Crear Nueva Cuenta'}</DialogTitle>
+            <DialogTitle>Editar {editingAccount?.name}</DialogTitle>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
               <FormField
                 control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre de la cuenta</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: Ahorros Bancolombia" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
                 name="initialBalance"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Saldo Inicial</FormLabel>
+                    <FormLabel>Saldo Base</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="0" {...field} />
+                      <Input type="number" placeholder="0" {...field} className="font-mono" />
                     </FormControl>
                     <FormDescription>
-                      El ajuste del saldo inicial recalculará el saldo actual.
+                      El ajuste del saldo base recalculará el saldo actual.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="includeInTotal"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                    <div className="space-y-0.5">
-                      <FormLabel>Incluir en Balance Total</FormLabel>
-                      <FormDescription>
-                        Si se desactiva, esta cuenta no sumará al total general.
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full">{editingId ? 'Guardar Cambios' : 'Crear Cuenta'}</Button>
+              <Button type="submit" className="w-full">Guardar Cambios</Button>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar Cuenta</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que quieres eliminar esta cuenta? Esta acción también eliminará todos los movimientos asociados a esta cuenta y no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-3">
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} className="bg-red-600 hover:bg-red-700">
-              Eliminar
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

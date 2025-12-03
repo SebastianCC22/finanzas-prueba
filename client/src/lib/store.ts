@@ -5,10 +5,15 @@ import { nanoid } from 'nanoid';
 export type TransactionType = 'ingreso' | 'egreso';
 export type PaymentMethod = 'Efectivo' | 'Nequi' | 'Daviplata' | 'Bolt';
 
+export type AccountCategory = 'cajas' | 'nequi' | 'bold' | 'daviplata';
+export type AccountTier = 'mayor' | 'menor';
+
 export interface Account {
   id: string;
   storeId: string;
   name: string;
+  category: AccountCategory;
+  tier: AccountTier;
   initialBalance: number;
   currentBalance: number;
   includeInTotal: boolean;
@@ -23,6 +28,26 @@ export interface Transaction {
   description: string;
   date: string;
   accountId: string;
+  productId?: string;
+}
+
+export interface Transfer {
+  id: string;
+  storeId: string;
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  date: string;
+  note: string;
+}
+
+export interface Product {
+  id: string;
+  storeId: string;
+  name: string;
+  price: number;
+  hasIva: boolean;
+  supplier: string;
 }
 
 export interface OpeningRecord {
@@ -33,19 +58,40 @@ export interface OpeningRecord {
   cajaMenor: number;
 }
 
+export const ACCOUNT_CATEGORIES: { id: AccountCategory; label: string }[] = [
+  { id: 'cajas', label: 'Cajas' },
+  { id: 'nequi', label: 'Nequi' },
+  { id: 'bold', label: 'Bold' },
+  { id: 'daviplata', label: 'Daviplata' },
+];
+
+export const DEFAULT_ACCOUNTS: { category: AccountCategory; tier: AccountTier; name: string }[] = [
+  { category: 'cajas', tier: 'mayor', name: 'Caja Mayor' },
+  { category: 'cajas', tier: 'menor', name: 'Caja Menor' },
+  { category: 'nequi', tier: 'mayor', name: 'Caja Mayor Nequi' },
+  { category: 'nequi', tier: 'menor', name: 'Caja Menor Nequi' },
+  { category: 'bold', tier: 'mayor', name: 'Caja Mayor Bold' },
+  { category: 'bold', tier: 'menor', name: 'Caja Menor Bold' },
+  { category: 'daviplata', tier: 'mayor', name: 'Caja Mayor Daviplata' },
+  { category: 'daviplata', tier: 'menor', name: 'Caja Menor Daviplata' },
+];
+
+const ADMIN_PASSWORD = '1234';
+
 interface AppState {
   isAuthenticated: boolean;
   currentStore: string | null;
   login: (storeName: string) => boolean;
   logout: () => void;
+  validateAdminPassword: (password: string) => boolean;
   
   lastOpeningDate: string | null;
   
   accounts: Account[];
   getStoreAccounts: () => Account[];
-  addAccount: (name: string, initialBalance: number, includeInTotal: boolean) => void;
-  updateAccount: (id: string, name: string, initialBalance: number, includeInTotal: boolean) => void;
-  deleteAccount: (id: string) => void;
+  getAccountsByCategory: (category: AccountCategory) => Account[];
+  initializeDefaultAccounts: () => void;
+  updateAccountBalance: (id: string, initialBalance: number) => void;
   
   transactions: Transaction[];
   getStoreTransactions: () => Transaction[];
@@ -53,6 +99,16 @@ interface AppState {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'storeId'>) => void;
   updateTransaction: (id: string, transaction: Partial<Omit<Transaction, 'id' | 'storeId'>>) => void;
   deleteTransaction: (id: string) => void;
+  
+  transfers: Transfer[];
+  getStoreTransfers: () => Transfer[];
+  addTransfer: (fromAccountId: string, toAccountId: string, amount: number, note: string) => { success: boolean; error?: string };
+  
+  products: Product[];
+  getStoreProducts: () => Product[];
+  addProduct: (product: Omit<Product, 'id' | 'storeId'>) => void;
+  updateProduct: (id: string, product: Partial<Omit<Product, 'id' | 'storeId'>>) => void;
+  deleteProduct: (id: string) => void;
   
   openings: OpeningRecord[];
   getStoreOpenings: () => OpeningRecord[];
@@ -67,11 +123,17 @@ export const useStore = create<AppState>()(
       isAuthenticated: false,
       currentStore: null,
       lastOpeningDate: null,
+      
       login: (storeName) => {
         set({ isAuthenticated: true, currentStore: storeName });
+        setTimeout(() => get().initializeDefaultAccounts(), 0);
         return true;
       },
       logout: () => set({ isAuthenticated: false, currentStore: null }),
+      
+      validateAdminPassword: (password) => {
+        return password === ADMIN_PASSWORD;
+      },
       
       accounts: [],
       getStoreAccounts: () => {
@@ -79,21 +141,44 @@ export const useStore = create<AppState>()(
         if (!currentStore) return [];
         return accounts.filter(a => a.storeId === currentStore);
       },
-      addAccount: (name, initialBalance, includeInTotal) => {
-        const { currentStore } = get();
+      getAccountsByCategory: (category) => {
+        const { accounts, currentStore } = get();
+        if (!currentStore) return [];
+        return accounts.filter(a => a.storeId === currentStore && a.category === category);
+      },
+      initializeDefaultAccounts: () => {
+        const { currentStore, accounts } = get();
         if (!currentStore) return;
         
-        const newAccount: Account = {
-          id: nanoid(),
-          storeId: currentStore,
-          name,
-          initialBalance,
-          currentBalance: initialBalance,
-          includeInTotal
-        };
-        set((state) => ({ accounts: [...state.accounts, newAccount] }));
+        const storeAccounts = accounts.filter(a => a.storeId === currentStore);
+        
+        const existingCombos = new Set(
+          storeAccounts.map(a => `${a.category}-${a.tier}`)
+        );
+        
+        const newAccounts: Account[] = [];
+        
+        DEFAULT_ACCOUNTS.forEach(({ category, tier, name }) => {
+          const key = `${category}-${tier}`;
+          if (!existingCombos.has(key)) {
+            newAccounts.push({
+              id: nanoid(),
+              storeId: currentStore,
+              name,
+              category,
+              tier,
+              initialBalance: 0,
+              currentBalance: 0,
+              includeInTotal: true,
+            });
+          }
+        });
+        
+        if (newAccounts.length > 0) {
+          set((state) => ({ accounts: [...state.accounts, ...newAccounts] }));
+        }
       },
-      updateAccount: (id, name, initialBalance, includeInTotal) => {
+      updateAccountBalance: (id, initialBalance) => {
         set((state) => {
           const oldAccount = state.accounts.find(a => a.id === id);
           if (!oldAccount) return state;
@@ -104,27 +189,14 @@ export const useStore = create<AppState>()(
             if (acc.id === id) {
               return {
                 ...acc,
-                name,
                 initialBalance,
                 currentBalance: acc.currentBalance + balanceDiff,
-                includeInTotal
               };
             }
             return acc;
           });
           
           return { accounts: updatedAccounts };
-        });
-      },
-      deleteAccount: (id) => {
-        set((state) => {
-          const updatedAccounts = state.accounts.filter(acc => acc.id !== id);
-          const updatedTransactions = state.transactions.filter(t => t.accountId !== id);
-          
-          return {
-            accounts: updatedAccounts,
-            transactions: updatedTransactions
-          };
         });
       },
       
@@ -158,7 +230,6 @@ export const useStore = create<AppState>()(
         set((state) => {
           const updatedTransactions = [...state.transactions, newTransaction];
           
-          // Update Account Balance
           const updatedAccounts = state.accounts.map(acc => {
             if (acc.id === transactionData.accountId) {
               const multiplier = transactionData.type === 'ingreso' ? 1 : -1;
@@ -181,7 +252,6 @@ export const useStore = create<AppState>()(
           const oldTx = state.transactions.find(t => t.id === id);
           if (!oldTx) return state;
 
-          // Revert old transaction effect
           let accounts = state.accounts.map(acc => {
              if (acc.id === oldTx.accountId) {
                const multiplier = oldTx.type === 'ingreso' ? -1 : 1; 
@@ -190,10 +260,8 @@ export const useStore = create<AppState>()(
              return acc;
           });
           
-          // Create merged new transaction
           const newTx = { ...oldTx, ...transactionData };
           
-          // Apply new transaction effect
           accounts = accounts.map(acc => {
              if (acc.id === newTx.accountId) {
                const multiplier = newTx.type === 'ingreso' ? 1 : -1; 
@@ -217,10 +285,9 @@ export const useStore = create<AppState>()(
           
           const updatedTransactions = state.transactions.filter(t => t.id !== id);
           
-          // Revert Account Balance
           const updatedAccounts = state.accounts.map(acc => {
             if (acc.id === txToDelete.accountId) {
-              const multiplier = txToDelete.type === 'ingreso' ? -1 : 1; // Reverse logic
+              const multiplier = txToDelete.type === 'ingreso' ? -1 : 1;
               return {
                 ...acc,
                 currentBalance: acc.currentBalance + (txToDelete.amount * multiplier)
@@ -234,6 +301,103 @@ export const useStore = create<AppState>()(
             accounts: updatedAccounts
           };
         });
+      },
+      
+      transfers: [],
+      getStoreTransfers: () => {
+        const { transfers, currentStore } = get();
+        if (!currentStore) return [];
+        return transfers.filter(t => t.storeId === currentStore);
+      },
+      addTransfer: (fromAccountId, toAccountId, amount, note) => {
+        const { currentStore } = get();
+        if (!currentStore) {
+          return { success: false, error: 'No hay tienda activa' };
+        }
+        
+        if (amount <= 0) {
+          return { success: false, error: 'El monto debe ser mayor a 0' };
+        }
+        
+        if (fromAccountId === toAccountId) {
+          return { success: false, error: 'Las cuentas de origen y destino deben ser diferentes' };
+        }
+        
+        const state = get();
+        const fromAccount = state.accounts.find(a => a.id === fromAccountId);
+        const toAccount = state.accounts.find(a => a.id === toAccountId);
+        
+        if (!fromAccount) {
+          return { success: false, error: 'Cuenta de origen no encontrada' };
+        }
+        
+        if (!toAccount) {
+          return { success: false, error: 'Cuenta de destino no encontrada' };
+        }
+        
+        if (fromAccount.currentBalance < amount) {
+          return { success: false, error: 'Fondos insuficientes en la cuenta de origen' };
+        }
+        
+        const newTransfer: Transfer = {
+          id: nanoid(),
+          storeId: currentStore,
+          fromAccountId,
+          toAccountId,
+          amount,
+          date: new Date().toISOString(),
+          note,
+        };
+        
+        set((state) => {
+          const updatedAccounts = state.accounts.map(acc => {
+            if (acc.id === fromAccountId) {
+              return { ...acc, currentBalance: acc.currentBalance - amount };
+            }
+            if (acc.id === toAccountId) {
+              return { ...acc, currentBalance: acc.currentBalance + amount };
+            }
+            return acc;
+          });
+          
+          return {
+            transfers: [...state.transfers, newTransfer],
+            accounts: updatedAccounts,
+          };
+        });
+        
+        return { success: true };
+      },
+      
+      products: [],
+      getStoreProducts: () => {
+        const { products, currentStore } = get();
+        if (!currentStore) return [];
+        return products.filter(p => p.storeId === currentStore);
+      },
+      addProduct: (productData) => {
+        const { currentStore } = get();
+        if (!currentStore) return;
+        
+        const newProduct: Product = {
+          ...productData,
+          id: nanoid(),
+          storeId: currentStore,
+        };
+        
+        set((state) => ({ products: [...state.products, newProduct] }));
+      },
+      updateProduct: (id, productData) => {
+        set((state) => ({
+          products: state.products.map(p => 
+            p.id === id ? { ...p, ...productData } : p
+          ),
+        }));
+      },
+      deleteProduct: (id) => {
+        set((state) => ({
+          products: state.products.filter(p => p.id !== id),
+        }));
       },
       
       openings: [],
@@ -256,7 +420,6 @@ export const useStore = create<AppState>()(
          };
          
          set(state => {
-           // Update Caja Mayor and Caja Menor accounts with opening values
            const updatedAccounts = state.accounts.map(acc => {
              if (acc.storeId === currentStore) {
                if (acc.name === "Caja Mayor") {
@@ -285,10 +448,19 @@ export const useStore = create<AppState>()(
          });
       },
 
-      reset: () => set({ accounts: [], transactions: [], openings: [], isAuthenticated: false, currentStore: null, lastOpeningDate: null })
+      reset: () => set({ 
+        accounts: [], 
+        transactions: [], 
+        transfers: [],
+        products: [],
+        openings: [], 
+        isAuthenticated: false, 
+        currentStore: null, 
+        lastOpeningDate: null 
+      })
     }),
     {
-      name: 'finanzas-pro-storage-v3', // Version bump for new schema
+      name: 'finanzas-pro-storage-v5',
     }
   )
 );

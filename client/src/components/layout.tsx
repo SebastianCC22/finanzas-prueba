@@ -10,7 +10,9 @@ import {
   Menu,
   Store,
   LockOpen,
-  Calculator
+  Calculator,
+  ArrowLeftRight,
+  Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,20 +28,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/apertura", label: "Apertura", icon: LockOpen },
     { href: "/ingresos", label: "Ingresos", icon: ArrowUpCircle },
     { href: "/egresos", label: "Egresos", icon: ArrowDownCircle },
+    { href: "/transferencias", label: "Transferencias", icon: ArrowLeftRight },
     { href: "/cierre", label: "Cierre", icon: Calculator },
     { href: "/cuentas", label: "Cuentas", icon: Wallet },
+    { href: "/inventario", label: "Inventario", icon: Package },
   ];
 
   const NavContent = () => (
     <div className="flex h-full flex-col gap-4">
       <div className="flex h-16 items-center px-6 border-b border-sidebar-border">
-        <Link href="/">
-          <div className="flex items-center gap-2 font-heading font-bold text-xl text-sidebar-primary cursor-pointer">
-            <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground text-sm">
-              FR
-            </div>
-            <span className="text-sidebar-foreground">Finanzas Rincon Integral</span>
+        <Link href="/" className="flex items-center gap-2 font-heading font-bold text-xl text-sidebar-primary cursor-pointer">
+          <div className="h-8 w-8 rounded-lg bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground text-sm">
+            FR
           </div>
+          <span className="text-sidebar-foreground">Finanzas Rincon Integral</span>
         </Link>
       </div>
 
@@ -61,19 +63,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {navItems.map((item) => {
             const isActive = location === item.href;
             return (
-              <Link key={item.href} href={item.href}>
-                <a
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                    isActive 
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" 
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  )}
-                  onClick={() => setIsMobileOpen(false)}
-                >
-                  <item.icon className={cn("h-4 w-4", isActive ? "text-current" : "text-sidebar-foreground/50")} />
-                  {item.label}
-                </a>
+              <Link 
+                key={item.href} 
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  isActive 
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" 
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                )}
+                onClick={() => setIsMobileOpen(false)}
+              >
+                <item.icon className={cn("h-4 w-4", isActive ? "text-current" : "text-sidebar-foreground/50")} />
+                {item.label}
               </Link>
             );
           })}
