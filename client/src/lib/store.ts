@@ -41,6 +41,19 @@ export interface Transfer {
   note: string;
 }
 
+export type ProductPresentation = 'unidad' | 'jarabe' | 'liquido' | 'polvo' | 'tabletas' | 'capsulas' | 'crema' | 'otro';
+
+export const PRODUCT_PRESENTATIONS: { id: ProductPresentation; label: string }[] = [
+  { id: 'unidad', label: 'Unidad' },
+  { id: 'jarabe', label: 'Jarabe' },
+  { id: 'liquido', label: 'Líquido' },
+  { id: 'polvo', label: 'Polvo' },
+  { id: 'tabletas', label: 'Tabletas' },
+  { id: 'capsulas', label: 'Cápsulas' },
+  { id: 'crema', label: 'Crema' },
+  { id: 'otro', label: 'Otro' },
+];
+
 export interface Product {
   id: string;
   storeId: string;
@@ -48,6 +61,10 @@ export interface Product {
   price: number;
   hasIva: boolean;
   supplier: string;
+  brand: string;
+  quantity: number;
+  presentation: ProductPresentation;
+  weight?: string;
 }
 
 export interface OpeningRecord {
