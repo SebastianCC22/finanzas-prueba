@@ -1,0 +1,424 @@
+✔ OBJETIVO DEL SISTEMA
+
+Desarrollar una aplicación completa en Python que gestione ventas, inventario, cajas, traspasos entre tiendas, devoluciones, reportes automáticos, alertas, múltiples métodos de pago y manejo de múltiples tiendas naturistas con independencia de inventarios y cajas.
+
+✔ ALCANCE
+
+La aplicación debe funcionar para varias tiendas (ejemplo: Tunal, 20 de Julio).
+Cada tienda opera de manera independiente en inventario y cajas menores.
+Las cajas mayores digitales se comparten entre todas las tiendas.
+
+La aplicación debe ser escalable para añadir nuevas tiendas y usuarios.
+
+1. MÓDULO DE VENTAS (POS)
+Conexión directa con el inventario
+Campos de venta:
+
+Producto (con buscador rápido y filtros)
+
+Cantidad
+
+Precio automático desde inventario
+
+Precio editable (para descuentos por ítem)
+
+Métodos de pago:
+
+Efectivo
+
+Nequi
+
+Bold
+
+Daviplata
+
+Pagos mixtos permitidos (ej: 10.000 efectivo + 5.000 Nequi)
+
+Selección de caja menor a la que se deposita el dinero según método
+
+Descripción del producto (si no existe en inventario)
+
+Fecha y hora automática
+
+Usuario que realizó la venta
+
+Funciones:
+
+Descontar inventario automáticamente
+
+Registrar venta en historial
+
+Exportar historial a PDF/Excel
+
+Buscador por:
+
+producto
+
+fecha
+
+método
+
+usuario
+
+Descuentos:
+
+Por ítem (editable manualmente el precio)
+
+Debe guardar:
+
+precio original
+
+precio final
+
+monto/porcentaje del descuento
+
+motivo del descuento
+
+usuario que aplicó
+
+Descuento global por venta (opcional)
+
+2. DEVOLUCIONES
+
+Debe permitir:
+
+Tipos:
+
+Devolución total
+
+Devolución parcial
+
+Campos:
+
+Seleccionar venta original
+
+Seleccionar productos y cantidades a devolver
+
+Motivo de devolución
+
+Usuario
+
+Fecha y hora
+
+Efectos automáticos:
+
+Reingresar inventario
+
+Restar dinero de caja según método original
+
+Registrar en historial
+
+Exportar historial
+
+3. INVENTARIO AVANZADO (ACCESO SOLO ADMIN)
+Campos por producto:
+
+Nombre
+
+Marca
+
+Proveedor
+
+Precio de venta
+
+Costo
+
+Cantidad
+
+Presentación:
+
+jarabe, líquido, polvo, tabletas, cápsulas, crema, gel, pomada, otros
+
+Peso o volumen
+
+IVA (sí/no)
+
+Fecha de vencimiento
+
+Stock mínimo
+
+Funciones:
+
+Agregar productos
+
+Editar productos
+
+Eliminar productos
+
+Filtros:
+
+marca
+
+proveedor
+
+presentación
+
+IVA
+
+stock
+
+Barra de búsqueda rápida
+
+Exportar inventario
+
+Historial de movimientos del inventario
+
+Alertas:
+
+productos agotados
+
+productos bajo stock mínimo
+
+productos próximos a vencer
+
+4. TRASPASO DE PRODUCTOS ENTRE TIENDAS
+Debe permitir:
+
+Seleccionar tienda origen
+
+Seleccionar tienda destino
+
+Buscar producto(s)
+
+Seleccionar cantidades
+
+Registro obligatorio:
+
+Usuario
+
+Fecha y hora
+
+Motivo
+
+Acciones automáticas:
+
+Restar del inventario de la tienda origen
+
+Sumar al inventario de la tienda destino
+
+Registrar en historial de traspasos
+
+Exportar historial (PDF/Excel)
+
+IMPORTANTE:
+
+No afecta ninguna caja ni método de pago.
+
+5. EGRESOS
+Campos:
+
+Monto
+
+Método de pago
+
+Selección de caja (mayor o menor según corresponda)
+
+Descripción
+
+Fecha
+
+Usuario
+
+Acciones automáticas:
+
+Descontar monto de caja correspondiente
+
+Registrar en historial
+
+Exportable a PDF/Excel
+
+6. TRANSFERENCIAS ENTRE CAJAS
+
+Debe permitir transferir entre:
+
+Caja mayor ⇆ caja menor
+Entre métodos
+Entre cajas mayores globales
+Reglas:
+
+Caja mayor efectivo: independiente por tienda
+
+Cajas mayores Nequi, Daviplata, Bold: globales entre tiendas
+
+No se puede transferir efectivo entre tiendas por cajas cruzadas
+
+Ejemplos válidos:
+
+Caja menor Nequi (20 de Julio) → Caja mayor Nequi (Global)
+
+Caja mayor Bold (Global) → Caja menor efectivo (Tunal)
+
+Caja mayor Daviplata (Global) → Caja mayor Nequi (Global)
+
+Registro obligatorio:
+
+Origen
+
+Destino
+
+Monto
+
+Nota
+
+Fecha/hora
+
+Usuario
+
+7. CAJAS
+Cajas menores por tienda:
+
+efectivo
+
+Nequi
+
+Bold
+
+Daviplata
+
+Cajas mayores:
+
+Efectivo → una por tienda
+
+Nequi → global
+
+Daviplata → global
+
+Bold → global
+
+8. APERTURA DE CAJA
+
+Base inicial
+
+Hora de apertura
+
+Usuario
+
+No permite ventas si no hay apertura
+
+Reset automático de cajas menores al iniciar el día
+
+9. CIERRE DE CAJA
+
+Por tienda:
+
+Debe mostrar:
+
+Base de apertura
+
+Ingresos
+
+Egresos
+
+Transferencias
+
+Total esperado
+
+Diferencias
+
+Usuario que cierra
+
+Exportar reporte imprimible / PDF.
+
+10. REPORTES AUTOMÁTICOS
+
+Automáticos y manuales.
+
+Incluye:
+
+Ventas totales
+
+Ventas por método
+
+Productos más vendidos
+
+Egresos
+
+Balance general
+
+Balance por tienda
+
+Inventario valorizado
+
+Margen de ganancia
+
+Productos agotados
+
+Productos por debajo de stock mínimo
+
+Salida:
+
+PDF
+
+Excel
+
+Envío automático por correo a administradores:
+
+Semanal
+
+Mensual
+
+11. COPIAS DE SEGURIDAD AUTOMÁTICAS
+
+Debe incluir:
+
+Backup diario
+
+Backup local
+
+Backup en nube (Google Drive / Dropbox / S3)
+
+Recuperación automática en caso de errores
+
+12. SISTEMA DE ALERTAS
+
+Generadas automáticamente:
+
+Productos agotados
+
+Stock en mínimo
+
+Productos próximos a vencer
+
+Caja menor en negativo o baja
+
+Apertura de caja pendiente
+
+Cierre de caja pendiente
+
+13. REQUERIMIENTOS TÉCNICOS
+
+Lenguaje: Python
+
+Arquitectura modular
+
+BD recomendada: PostgreSQL, aunque puede ser SQLite o MySQL
+
+Interfaz:
+
+Desktop (Tkinter o PyQt) o
+
+Web (Flask / Django / FastAPI)
+
+Código limpio, organizado y documentado
+
+Totalmente escalable
+
+Sistema multiusuario con roles
+
+14. ENTREGA ESPERADA DE LA IA
+
+Debe entregar:
+
+Arquitectura completa del sistema
+
+Diseño de la base de datos
+
+Código Python completo
+
+Scripts de instalación
+
+Manual del usuario
+
+Archivos ejecutables o instrucciones para generarlos
+
+Opcional: .exe o instalador
