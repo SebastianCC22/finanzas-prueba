@@ -1,47 +1,87 @@
-import { useStore } from "@/lib/store";
+import { useState, useEffect } from "react";
+import { useAuthStore } from "@/lib/authStore";
+import { api, CashOpening } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { LockOpen, History, Check, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { LockOpen, History } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
-const openingSchema = z.object({
-  cajaMayor: z.coerce.number().min(0, "El valor debe ser positivo"),
-  cajaMenor: z.coerce.number().min(0, "El valor debe ser positivo"),
-});
 
 export default function Apertura() {
-  const { addOpening, getStoreOpenings, currentStore } = useStore();
-  const openings = getStoreOpenings();
+  const { currentStore } = useAuthStore();
   const { toast } = useToast();
+  
+  const [openings, setOpenings] = useState<CashOpening[]>([]);
+  const [todayOpening, setTodayOpening] = useState<CashOpening | null>(null);
+  const [initialBalance, setInitialBalance] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<z.infer<typeof openingSchema>>({
-    resolver: zodResolver(openingSchema),
-    defaultValues: {
-      cajaMayor: 0,
-      cajaMenor: 0,
-    },
-  });
+  useEffect(() => {
+    if (currentStore) {
+      loadData();
+    }
+  }, [currentStore]);
 
-  function onSubmit(values: z.infer<typeof openingSchema>) {
-    addOpening(values.cajaMayor, values.cajaMenor);
-    toast({
-      title: "Apertura Registrada",
-      description: `Se han registrado los valores de apertura para ${currentStore}.`,
-    });
-    form.reset({ cajaMayor: 0, cajaMenor: 0 });
-  }
+  const loadData = async () => {
+    if (!currentStore) return;
+    try {
+      const [openingsData, todayData] = await Promise.all([
+        api.getCashOpenings({ storeId: currentStore.id }),
+        api.getTodayOpening(currentStore.id),
+      ]);
+      setOpenings(openingsData);
+      setTodayOpening(todayData);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentStore) return;
+
+    setIsSubmitting(true);
+    try {
+      await api.createCashOpening({
+        store_id: currentStore.id,
+        initial_balance: parseFloat(initialBalance) || 0,
+        notes: notes || undefined,
+      });
+
+      toast({
+        title: "Apertura Registrada",
+        description: `Se ha registrado la apertura de caja para ${currentStore.name}`,
+      });
+
+      setInitialBalance("");
+      setNotes("");
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
       minimumFractionDigits: 0,
     }).format(value);
   };
@@ -49,12 +89,37 @@ export default function Apertura() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Apertura de Caja</h1>
-        <p className="text-muted-foreground mt-1">Registro informativo de valores iniciales del día</p>
+        <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
+          Apertura de Caja
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Registro de valores iniciales del día - {currentStore?.name}
+        </p>
       </div>
 
+      {todayOpening && (
+        <Card className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
+                <Check className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="font-medium text-emerald-700 dark:text-emerald-300">
+                  Apertura realizada hoy
+                </p>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                  {format(new Date(todayOpening.opening_date), "PPP 'a las' p", { locale: es })}
+                  {" - "}
+                  Base: {formatCurrency(todayOpening.initial_balance)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Registration Form */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -64,46 +129,53 @@ export default function Apertura() {
             <CardDescription>Ingresa los valores base de las cajas</CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="cajaMayor"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Base Caja Mayor</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} className="text-lg" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="cajaMenor"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Base Caja Menor</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} className="text-lg" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <Button type="submit" className="w-full h-11 text-base">
-                  Registrar Apertura
+            {todayOpening ? (
+              <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+                <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Ya se realizó la apertura de caja hoy. Solo se permite una apertura por día.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="initialBalance">Base Inicial (Efectivo)</Label>
+                  <Input
+                    id="initialBalance"
+                    type="number"
+                    placeholder="0"
+                    value={initialBalance}
+                    onChange={(e) => setInitialBalance(e.target.value)}
+                    className="text-lg font-mono"
+                    data-testid="input-initial-balance"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notas (opcional)</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Notas adicionales..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    data-testid="input-notes"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-11 text-base"
+                  disabled={isSubmitting}
+                  data-testid="button-submit"
+                >
+                  {isSubmitting ? "Registrando..." : "Registrar Apertura"}
                 </Button>
               </form>
-            </Form>
+            )}
           </CardContent>
         </Card>
 
-        {/* History */}
-        <Card className="md:row-span-2 h-fit">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
@@ -114,24 +186,32 @@ export default function Apertura() {
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
               {openings.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  No hay aperturas registradas en esta tienda.
+                  No hay aperturas registradas.
                 </div>
               ) : (
-                openings.map((opening) => (
-                  <div key={opening.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
-                    <div className="text-xs font-medium text-muted-foreground bg-muted inline-block px-2 py-1 rounded">
-                      {format(new Date(opening.date), "PPP p", { locale: es })}
+                openings.slice(0, 10).map((opening) => (
+                  <div
+                    key={opening.id}
+                    className="border rounded-lg p-3 space-y-2 bg-muted/20"
+                    data-testid={`opening-${opening.id}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline">
+                        {format(new Date(opening.opening_date), "PPP", { locale: es })}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(opening.opening_date), "p", { locale: es })}
+                      </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground block text-xs">Caja Mayor</span>
-                        <span className="font-mono font-medium">{formatCurrency(opening.cajaMayor)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block text-xs">Caja Menor</span>
-                        <span className="font-mono font-medium">{formatCurrency(opening.cajaMenor)}</span>
-                      </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Base Inicial</span>
+                      <span className="font-mono font-medium">
+                        {formatCurrency(opening.initial_balance)}
+                      </span>
                     </div>
+                    {opening.notes && (
+                      <p className="text-xs text-muted-foreground">{opening.notes}</p>
+                    )}
                   </div>
                 ))
               )}

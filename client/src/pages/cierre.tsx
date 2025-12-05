@@ -1,98 +1,120 @@
-import { useStore, PaymentMethod, ACCOUNT_CATEGORIES, AccountCategory } from "@/lib/store";
+import { useState, useEffect } from "react";
+import { useAuthStore } from "@/lib/authStore";
+import { api, CashOpening, CashClosing, CashRegister } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowDownCircle, ArrowUpCircle, Wallet, Calculator, Banknote, Smartphone, CreditCard, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Calculator, History, Wallet, ArrowUpCircle, ArrowDownCircle,
+  AlertCircle, Download, Check, X
+} from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-const categoryIcons: Record<AccountCategory, React.ReactNode> = {
-  cajas: <Banknote className="h-5 w-5" />,
-  nequi: <Smartphone className="h-5 w-5" />,
-  bold: <CreditCard className="h-5 w-5" />,
-  daviplata: <DollarSign className="h-5 w-5" />,
-};
-
-const categoryColors: Record<AccountCategory, { bg: string; text: string; border: string }> = {
-  cajas: { bg: 'from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/20', text: 'text-green-700 dark:text-green-400', border: 'border-green-200 dark:border-green-800' },
-  nequi: { bg: 'from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/20', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-800' },
-  bold: { bg: 'from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/20', text: 'text-orange-700 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800' },
-  daviplata: { bg: 'from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20', text: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800' },
-};
-
 export default function Cierre() {
-  const { getStoreTransactions, getStoreAccounts, getAccountsByCategory } = useStore();
-  const transactions = getStoreTransactions();
-  const accounts = getStoreAccounts();
+  const { currentStore } = useAuthStore();
+  const { toast } = useToast();
 
-  const methods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Bolt'];
-  
-  const accountsByMethod: { [key in PaymentMethod]?: number } = {
-    'Efectivo': accounts.find(a => a.name.toLowerCase().includes('efectivo'))?.initialBalance || 0,
-    'Nequi': accounts.find(a => a.name.toLowerCase().includes('nequi'))?.initialBalance || 0,
-    'Daviplata': accounts.find(a => a.name.toLowerCase().includes('daviplata'))?.initialBalance || 0,
-    'Bolt': accounts.find(a => a.name.toLowerCase().includes('bolt'))?.initialBalance || 0,
+  const [todayOpening, setTodayOpening] = useState<CashOpening | null>(null);
+  const [closings, setClosings] = useState<CashClosing[]>([]);
+  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
+  const [showClosingDialog, setShowClosingDialog] = useState(false);
+  const [actualBalance, setActualBalance] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (currentStore) {
+      loadData();
+    }
+  }, [currentStore]);
+
+  const loadData = async () => {
+    if (!currentStore) return;
+    try {
+      const [openingData, closingsData, registersData] = await Promise.all([
+        api.getTodayOpening(currentStore.id),
+        api.getCashClosings({ storeId: currentStore.id }),
+        api.getCashRegisters(currentStore.id, true),
+      ]);
+      setTodayOpening(openingData);
+      setClosings(closingsData);
+      setCashRegisters(registersData);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
-  
-  const statsByMethod = methods.map(method => {
-    const transactionIncome = transactions
-      .filter(t => t.type === 'ingreso' && t.method === method)
-      .reduce((sum, t) => sum + t.amount, 0);
-    
-    const accountBalance = accountsByMethod[method] || 0;
-    const income = transactionIncome + accountBalance;
-      
-    const expense = transactions
-      .filter(t => t.type === 'egreso' && t.method === method)
-      .reduce((sum, t) => sum + t.amount, 0);
-      
-    return {
-      method,
-      income,
-      expense,
-      balance: income - expense
-    };
-  });
 
-  const totalIncome = statsByMethod.reduce((acc, curr) => acc + curr.income, 0);
-  const totalExpense = statsByMethod.reduce((acc, curr) => acc + curr.expense, 0);
-  const totalBalance = totalIncome - totalExpense;
+  const handleClosing = async () => {
+    if (!currentStore || !todayOpening) return;
 
-  const calculateCategoryStats = (category: AccountCategory) => {
-    const categoryAccounts = getAccountsByCategory(category);
-    
-    return categoryAccounts.map(account => {
-      const base = account.initialBalance;
-      const ingresos = transactions
-        .filter(t => t.type === 'ingreso' && t.accountId === account.id)
-        .reduce((sum, t) => sum + t.amount, 0);
-      const egresos = transactions
-        .filter(t => t.type === 'egreso' && t.accountId === account.id)
-        .reduce((sum, t) => sum + t.amount, 0);
-      const saldo = base + ingresos - egresos;
-      
-      return {
-        ...account,
-        base,
-        ingresos,
-        egresos,
-        saldo,
-      };
-    });
+    setIsSubmitting(true);
+    try {
+      await api.createCashClosing({
+        opening_id: todayOpening.id,
+        store_id: currentStore.id,
+        actual_balance: parseFloat(actualBalance) || 0,
+        notes: notes || undefined,
+      });
+
+      toast({
+        title: "Cierre registrado",
+        description: "El cierre de caja se ha registrado correctamente",
+      });
+
+      setShowClosingDialog(false);
+      setActualBalance("");
+      setNotes("");
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
       minimumFractionDigits: 0,
     }).format(value);
   };
 
-  const grandTotal = accounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
+  const totalBalance = cashRegisters
+    .filter((r) => r.store_id === currentStore?.id)
+    .reduce((sum, r) => sum + r.current_balance, 0);
+
+  const todayClosing = closings.find((c) => c.opening_id === todayOpening?.id);
+
+  const downloadReport = (closingId: number) => {
+    const url = api.getClosingReportUrl(closingId);
+    window.open(url, "_blank");
+  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Cierre de Caja</h1>
-        <p className="text-muted-foreground mt-1">Balance completo de todas las cajas y métodos de pago</p>
+        <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
+          Cierre de Caja
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Balance de cajas y cierre del día - {currentStore?.name}
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -104,141 +126,246 @@ export default function Cierre() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold font-mono">{formatCurrency(grandTotal)}</div>
+            <div className="text-3xl font-bold font-mono" data-testid="text-total-balance">
+              {formatCurrency(totalBalance)}
+            </div>
             <p className="text-xs text-indigo-200 mt-1">Suma de todas las cajas</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <ArrowUpCircle className="h-4 w-4 text-emerald-500" /> Total Ingresos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-emerald-600">{formatCurrency(totalIncome)}</div>
           </CardContent>
         </Card>
 
         <Card>
-           <CardHeader className="pb-2">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <ArrowDownCircle className="h-4 w-4 text-rose-500" /> Total Egresos
+              <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
+              Estado de Apertura
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-rose-600">{formatCurrency(totalExpense)}</div>
+            {todayOpening ? (
+              <div>
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">
+                  <Check className="h-3 w-3 mr-1" />
+                  Abierta
+                </Badge>
+                <p className="text-sm mt-2">
+                  Base: {formatCurrency(todayOpening.initial_balance)}
+                </p>
+              </div>
+            ) : (
+              <Badge variant="destructive">
+                <X className="h-3 w-3 mr-1" />
+                Sin apertura hoy
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <ArrowDownCircle className="h-4 w-4 text-rose-500" />
+              Estado de Cierre
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {todayClosing ? (
+              <div>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                  <Check className="h-3 w-3 mr-1" />
+                  Cerrada
+                </Badge>
+                <p className="text-sm mt-2">
+                  Balance: {formatCurrency(todayClosing.actual_balance)}
+                </p>
+              </div>
+            ) : todayOpening ? (
+              <Button
+                onClick={() => setShowClosingDialog(true)}
+                className="w-full"
+                data-testid="button-close-cash"
+              >
+                Realizar Cierre
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Primero debe realizar la apertura
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Saldo de Todas las Cajas</CardTitle>
-          <CardDescription>Estado actual de cada caja por categoría</CardDescription>
+          <CardTitle>Saldo de Cajas</CardTitle>
+          <CardDescription>Estado actual de cada caja</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-6 md:grid-cols-2">
-            {ACCOUNT_CATEGORIES.map((cat) => {
-              const stats = calculateCategoryStats(cat.id);
-              const colors = categoryColors[cat.id];
-              const categoryTotal = stats.reduce((sum, s) => sum + s.saldo, 0);
-              
-              return (
-                <div key={cat.id} className={cn("border rounded-xl p-5 bg-gradient-to-br relative overflow-hidden", colors.bg, colors.border)}>
-                  <div className="absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full bg-current opacity-5 pointer-events-none" />
-                  
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className={cn("font-bold text-xl flex items-center gap-2", colors.text)}>
-                      {categoryIcons[cat.id]}
-                      {cat.label}
-                    </h3>
-                    <span className={cn("font-mono font-bold text-lg", colors.text)}>
-                      {formatCurrency(categoryTotal)}
-                    </span>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {cashRegisters
+              .filter((r) => r.store_id === currentStore?.id || r.is_global)
+              .map((register) => (
+                <div
+                  key={register.id}
+                  className="p-4 border rounded-lg bg-muted/20"
+                  data-testid={`register-${register.id}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                    {register.is_global && (
+                      <Badge variant="outline" className="text-xs">
+                        Global
+                      </Badge>
+                    )}
                   </div>
-                  
-                  <div className="space-y-3">
-                    {stats.map((account) => (
-                      <div key={account.id} className="bg-white dark:bg-gray-900/50 rounded-lg p-3 border shadow-sm">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium text-sm flex items-center gap-2">
-                            <Wallet className="h-4 w-4 text-muted-foreground" />
-                            {account.tier === 'mayor' ? 'Caja Mayor' : 'Caja Menor'}
-                          </span>
-                          <span className={cn("font-mono font-bold", account.saldo >= 0 ? "" : "text-rose-600")}>
-                            {formatCurrency(account.saldo)}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                          <div>
-                            <span className="text-muted-foreground block">Base</span>
-                            <span className="font-mono">{formatCurrency(account.base)}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block">Ingresos</span>
-                            <span className="font-mono text-emerald-600">+{formatCurrency(account.ingresos)}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block">Egresos</span>
-                            <span className="font-mono text-rose-600">-{formatCurrency(account.egresos)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="font-medium text-sm">{register.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize mb-2">
+                    {register.payment_method} - {register.register_type}
+                  </p>
+                  <p
+                    className={cn(
+                      "font-mono font-bold text-lg",
+                      register.current_balance < 0 && "text-destructive"
+                    )}
+                  >
+                    {formatCurrency(register.current_balance)}
+                  </p>
                 </div>
-              );
-            })}
+              ))}
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Desglose por Método de Pago</CardTitle>
-          <CardDescription>Detalle de movimientos y saldo final por canal</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Historial de Cierres
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {statsByMethod.map((stat) => (
-              <div key={stat.method} className="border rounded-xl p-4 bg-card hover:bg-accent/5 transition-colors relative overflow-hidden">
-                <div className={cn(
-                  "absolute top-0 right-0 w-24 h-24 -mr-6 -mt-6 rounded-full opacity-5 pointer-events-none",
-                  stat.method === 'Efectivo' ? 'bg-green-500' : 
-                  stat.method === 'Nequi' ? 'bg-purple-500' : 
-                  stat.method === 'Daviplata' ? 'bg-red-500' : 'bg-orange-500'
-                )} />
-                
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  {stat.method === 'Efectivo' && <Wallet className="h-4 w-4 text-green-600" />}
-                  {stat.method === 'Nequi' && <Wallet className="h-4 w-4 text-purple-600" />}
-                  {stat.method === 'Daviplata' && <Wallet className="h-4 w-4 text-red-600" />}
-                  {stat.method === 'Bolt' && <Wallet className="h-4 w-4 text-orange-600" />}
-                  {stat.method}
-                </h3>
-                
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Ingresos</span>
-                    <span className="font-mono text-emerald-600 font-medium">+{formatCurrency(stat.income)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Egresos</span>
-                    <span className="font-mono text-rose-600 font-medium">-{formatCurrency(stat.expense)}</span>
-                  </div>
-                  <div className="pt-3 border-t mt-2 flex justify-between items-center font-bold">
-                    <span>Balance</span>
-                    <span className={cn("font-mono text-lg", stat.balance >= 0 ? "text-foreground" : "text-rose-600")}>
-                      {formatCurrency(stat.balance)}
-                    </span>
-                  </div>
-                </div>
+          <div className="space-y-4 max-h-[400px] overflow-y-auto">
+            {closings.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay cierres registrados
               </div>
-            ))}
+            ) : (
+              closings.slice(0, 10).map((closing) => (
+                <div
+                  key={closing.id}
+                  className="p-4 border rounded-lg"
+                  data-testid={`closing-${closing.id}`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <Badge variant="outline">
+                      {format(new Date(closing.closing_date), "PPP", { locale: es })}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => downloadReport(closing.id)}
+                      data-testid={`button-download-${closing.id}`}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      PDF
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground block">Ventas</span>
+                      <span className="font-mono text-emerald-600">
+                        +{formatCurrency(closing.total_sales)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block">Egresos</span>
+                      <span className="font-mono text-rose-600">
+                        -{formatCurrency(closing.total_expenses)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block">Esperado</span>
+                      <span className="font-mono">
+                        {formatCurrency(closing.expected_balance)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block">Real</span>
+                      <span className="font-mono font-bold">
+                        {formatCurrency(closing.actual_balance)}
+                      </span>
+                    </div>
+                  </div>
+                  {closing.difference !== 0 && (
+                    <div
+                      className={cn(
+                        "mt-2 p-2 rounded text-sm",
+                        closing.difference > 0
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-rose-50 text-rose-700"
+                      )}
+                    >
+                      Diferencia: {formatCurrency(closing.difference)}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showClosingDialog} onOpenChange={setShowClosingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cierre de Caja</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">Base de apertura</p>
+              <p className="font-mono font-bold text-lg">
+                {formatCurrency(todayOpening?.initial_balance || 0)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="actualBalance">Balance Real (conteo físico)</Label>
+              <Input
+                id="actualBalance"
+                type="number"
+                placeholder="0"
+                value={actualBalance}
+                onChange={(e) => setActualBalance(e.target.value)}
+                className="font-mono text-lg"
+                data-testid="input-actual-balance"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notas (opcional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Observaciones del cierre..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                data-testid="input-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClosingDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleClosing}
+              disabled={isSubmitting || !actualBalance}
+              data-testid="button-confirm-closing"
+            >
+              {isSubmitting ? "Procesando..." : "Confirmar Cierre"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
