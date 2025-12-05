@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -23,15 +24,11 @@ def export_to_excel(data: List[Dict[str, Any]], headers: List[str], title: str =
         bottom=Side(style='thin')
     )
     
-    ws.append([title])
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
-    ws['A1'].font = Font(bold=True, size=14)
-    ws['A1'].alignment = Alignment(horizontal='center')
+    ws.cell(row=1, column=1, value=title)
+    ws.cell(row=1, column=1).font = Font(bold=True, size=14)
+    ws.cell(row=1, column=1).alignment = Alignment(horizontal='center')
     
-    ws.append([f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
-    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
-    
-    ws.append([])
+    ws.cell(row=2, column=1, value=f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=4, column=col_num, value=header)
@@ -42,22 +39,23 @@ def export_to_excel(data: List[Dict[str, Any]], headers: List[str], title: str =
     
     for row_num, row_data in enumerate(data, 5):
         for col_num, header in enumerate(headers, 1):
-            key = header.lower().replace(' ', '_')
+            key = header.lower().replace(' ', '_').replace('ó', 'o').replace('í', 'i').replace('á', 'a').replace('é', 'e').replace('ú', 'u')
             value = row_data.get(key, row_data.get(header, ''))
             cell = ws.cell(row=row_num, column=col_num, value=value)
             cell.border = thin_border
     
-    for col in ws.columns:
+    for col_idx in range(1, len(headers) + 1):
         max_length = 0
-        column = col[0].column_letter
-        for cell in col:
+        column_letter = get_column_letter(col_idx)
+        for row in range(1, len(data) + 5):
+            cell = ws.cell(row=row, column=col_idx)
             try:
-                if len(str(cell.value)) > max_length:
+                if cell.value and len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
             except:
                 pass
         adjusted_width = min(max_length + 2, 50)
-        ws.column_dimensions[column].width = adjusted_width
+        ws.column_dimensions[column_letter].width = adjusted_width
     
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -93,7 +91,7 @@ def export_to_pdf(data: List[Dict[str, Any]], headers: List[str], title: str = "
     for row in data:
         row_values = []
         for header in headers:
-            key = header.lower().replace(' ', '_')
+            key = header.lower().replace(' ', '_').replace('ó', 'o').replace('í', 'i').replace('á', 'a').replace('é', 'e').replace('ú', 'u')
             value = row.get(key, row.get(header, ''))
             row_values.append(str(value) if value else '')
         table_data.append(row_values)
@@ -124,43 +122,43 @@ def export_to_pdf(data: List[Dict[str, Any]], headers: List[str], title: str = "
     return buffer.getvalue()
 
 def generate_sales_report_data(sales) -> tuple:
-    headers = ["Número", "Fecha", "Total", "Método de Pago", "Usuario", "Tienda"]
+    headers = ["Numero", "Fecha", "Total", "Metodo de Pago", "Usuario", "Tienda"]
     data = []
     for sale in sales:
         payment_methods = ", ".join([p.payment_method for p in sale.payments]) if sale.payments else "N/A"
         data.append({
-            "número": sale.sale_number,
+            "numero": sale.sale_number,
             "fecha": sale.created_at.strftime('%Y-%m-%d %H:%M'),
-            "total": f"${sale.total:,.2f}",
-            "método_de_pago": payment_methods,
+            "total": f"${float(sale.total):,.0f}",
+            "metodo_de_pago": payment_methods,
             "usuario": sale.user.full_name or sale.user.username if sale.user else "N/A",
             "tienda": sale.store.name if sale.store else "N/A"
         })
     return headers, data
 
 def generate_inventory_report_data(products) -> tuple:
-    headers = ["Producto", "Marca", "Cantidad", "Precio", "Stock Mínimo", "Vencimiento"]
+    headers = ["Producto", "Marca", "Cantidad", "Precio", "Stock Minimo", "Proveedor"]
     data = []
     for product in products:
         data.append({
             "producto": product.name,
             "marca": product.brand or "N/A",
             "cantidad": product.quantity,
-            "precio": f"${product.sale_price:,.2f}",
-            "stock_mínimo": product.min_stock,
-            "vencimiento": product.expiration_date.strftime('%Y-%m-%d') if product.expiration_date else "N/A"
+            "precio": f"${float(product.sale_price):,.0f}",
+            "stock_minimo": product.min_stock,
+            "proveedor": product.supplier or "N/A"
         })
     return headers, data
 
 def generate_expenses_report_data(expenses) -> tuple:
-    headers = ["Fecha", "Monto", "Método", "Descripción", "Usuario", "Tienda"]
+    headers = ["Fecha", "Monto", "Metodo", "Descripcion", "Usuario", "Tienda"]
     data = []
     for expense in expenses:
         data.append({
             "fecha": expense.created_at.strftime('%Y-%m-%d %H:%M'),
-            "monto": f"${expense.amount:,.2f}",
-            "método": expense.payment_method,
-            "descripción": expense.description[:50] + "..." if len(expense.description) > 50 else expense.description,
+            "monto": f"${float(expense.amount):,.0f}",
+            "metodo": expense.payment_method,
+            "descripcion": expense.description[:50] + "..." if len(expense.description) > 50 else expense.description,
             "usuario": "N/A",
             "tienda": "N/A"
         })
@@ -185,14 +183,14 @@ def generate_cash_closing_report(closing, opening, sales, expenses, transfers_in
     info_data = [
         ["Fecha de Apertura:", opening.opening_date.strftime('%Y-%m-%d %H:%M')],
         ["Fecha de Cierre:", closing.closing_date.strftime('%Y-%m-%d %H:%M')],
-        ["Base Inicial:", f"${opening.initial_balance:,.2f}"],
-        ["Total Ventas:", f"${closing.total_sales:,.2f}"],
-        ["Total Egresos:", f"${closing.total_expenses:,.2f}"],
-        ["Transferencias Entrantes:", f"${closing.total_transfers_in:,.2f}"],
-        ["Transferencias Salientes:", f"${closing.total_transfers_out:,.2f}"],
-        ["Balance Esperado:", f"${closing.expected_balance:,.2f}"],
-        ["Balance Real:", f"${closing.actual_balance:,.2f}"],
-        ["Diferencia:", f"${closing.difference:,.2f}"],
+        ["Base Inicial:", f"${float(opening.initial_balance):,.0f}"],
+        ["Total Ventas:", f"${float(closing.total_sales):,.0f}"],
+        ["Total Egresos:", f"${float(closing.total_expenses):,.0f}"],
+        ["Transferencias Entrantes:", f"${float(closing.total_transfers_in):,.0f}"],
+        ["Transferencias Salientes:", f"${float(closing.total_transfers_out):,.0f}"],
+        ["Balance Esperado:", f"${float(closing.expected_balance):,.0f}"],
+        ["Balance Real:", f"${float(closing.actual_balance):,.0f}"],
+        ["Diferencia:", f"${float(closing.difference):,.0f}"],
     ]
     
     info_table = Table(info_data, colWidths=[200, 200])

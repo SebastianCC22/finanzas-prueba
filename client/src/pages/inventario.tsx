@@ -34,6 +34,7 @@ export default function Inventario() {
   const [filterPresentation, setFilterPresentation] = useState("all");
   const [filterSupplier, setFilterSupplier] = useState("all");
   const [filterBrand, setFilterBrand] = useState("all");
+  const [filterOutOfStock, setFilterOutOfStock] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -93,17 +94,19 @@ export default function Inventario() {
       const matchesPresentation = filterPresentation === "all" || p.presentation === filterPresentation;
       const matchesSupplier = filterSupplier === "all" || p.supplier === filterSupplier;
       const matchesBrand = filterBrand === "all" || p.brand === filterBrand;
+      const matchesOutOfStock = !filterOutOfStock || p.quantity === 0;
 
-      return matchesSearch && matchesPresentation && matchesSupplier && matchesBrand;
+      return matchesSearch && matchesPresentation && matchesSupplier && matchesBrand && matchesOutOfStock;
     });
-  }, [products, searchTerm, filterPresentation, filterSupplier, filterBrand]);
+  }, [products, searchTerm, filterPresentation, filterSupplier, filterBrand, filterOutOfStock]);
 
-  const hasActiveFilters = filterPresentation !== "all" || filterSupplier !== "all" || filterBrand !== "all";
+  const hasActiveFilters = filterPresentation !== "all" || filterSupplier !== "all" || filterBrand !== "all" || filterOutOfStock;
 
   const clearFilters = () => {
     setFilterPresentation("all");
     setFilterSupplier("all");
     setFilterBrand("all");
+    setFilterOutOfStock(false);
     setSearchTerm("");
   };
 
@@ -320,6 +323,17 @@ export default function Inventario() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Button
+                variant={filterOutOfStock ? "destructive" : "outline"}
+                size="sm"
+                className="h-8 text-xs gap-1"
+                onClick={() => setFilterOutOfStock(!filterOutOfStock)}
+                data-testid="button-filter-out-of-stock"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                Agotados
+              </Button>
 
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs gap-1">

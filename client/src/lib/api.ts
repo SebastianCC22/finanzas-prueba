@@ -233,6 +233,13 @@ class ApiClient {
     return this.request<CashOpening | null>(`/cash-openings/today/${storeId}`);
   }
 
+  async updateCashOpening(openingId: number, data: { initial_balance?: number; notes?: string }) {
+    return this.request<CashOpening>(`/cash-openings/${openingId}`, {
+      method: 'PUT',
+      body: data,
+    });
+  }
+
   async createCashClosing(closingData: CashClosingCreate) {
     return this.request<CashClosing>('/cash-closings', {
       method: 'POST',
@@ -507,6 +514,7 @@ export interface ReturnFilters {
 export interface ProductTransfer {
   id: number;
   product_id: number;
+  product_name: string | null;
   from_store_id: number;
   to_store_id: number;
   user_id: number;

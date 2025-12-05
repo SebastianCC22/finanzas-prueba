@@ -243,6 +243,7 @@ export default function TraspasosProductos() {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Producto</TableHead>
                     <TableHead>Destino</TableHead>
+                    <TableHead>Motivo</TableHead>
                     <TableHead className="text-right">Cantidad</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -253,10 +254,13 @@ export default function TraspasosProductos() {
                         {format(new Date(transfer.created_at), "dd/MM/yyyy")}
                       </TableCell>
                       <TableCell>
-                        #{transfer.product_id}
+                        {transfer.product_name || `#${transfer.product_id}`}
                       </TableCell>
                       <TableCell>
                         {stores.find((s) => s.id === transfer.to_store_id)?.name || "N/A"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {transfer.reason || "-"}
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge variant="secondary">{transfer.quantity}</Badge>

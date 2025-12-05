@@ -230,6 +230,7 @@ class ProductTransferCreate(BaseModel):
 class ProductTransferResponse(BaseModel):
     id: int
     product_id: int
+    product_name: Optional[str] = None
     from_store_id: int
     to_store_id: int
     user_id: int
@@ -239,6 +240,10 @@ class ProductTransferResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CashOpeningUpdate(BaseModel):
+    initial_balance: Optional[float] = None
+    notes: Optional[str] = None
 
 class ExpenseCreate(BaseModel):
     store_id: int

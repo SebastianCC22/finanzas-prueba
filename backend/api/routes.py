@@ -22,7 +22,7 @@ from backend.api.schemas import (
     ProductTransferCreate, ProductTransferResponse,
     ExpenseCreate, ExpenseResponse,
     CashTransferCreate, CashTransferResponse,
-    CashOpeningCreate, CashOpeningResponse,
+    CashOpeningCreate, CashOpeningResponse, CashOpeningUpdate,
     CashClosingCreate, CashClosingResponse,
     AlertResponse, StockMovementResponse, DashboardStats
 )
@@ -342,7 +342,7 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
                 )
                 db.add(movement)
     
-    total = subtotal + tax_total - Decimal(str(sale_data.global_discount))
+    total = subtotal - Decimal(str(sale_data.global_discount))
     sale.subtotal = subtotal
     sale.tax_total = tax_total
     sale.discount_total = discount_total
@@ -619,7 +619,25 @@ def get_product_transfers(
     if end_date:
         query = query.filter(ProductTransfer.created_at <= end_date)
     
-    return query.order_by(ProductTransfer.created_at.desc()).all()
+    transfers = query.order_by(ProductTransfer.created_at.desc()).all()
+    
+    result = []
+    for transfer in transfers:
+        product = db.query(Product).filter(Product.id == transfer.product_id).first()
+        transfer_dict = {
+            "id": transfer.id,
+            "product_id": transfer.product_id,
+            "product_name": product.name if product else None,
+            "from_store_id": transfer.from_store_id,
+            "to_store_id": transfer.to_store_id,
+            "user_id": transfer.user_id,
+            "quantity": transfer.quantity,
+            "reason": transfer.reason,
+            "created_at": transfer.created_at
+        }
+        result.append(transfer_dict)
+    
+    return result
 
 @router.post("/expenses", response_model=ExpenseResponse)
 def create_expense(expense_data: ExpenseCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -790,6 +808,39 @@ def get_today_opening(store_id: int, db: Session = Depends(get_db)):
         CashOpening.store_id == store_id,
         func.date(CashOpening.opening_date) == today
     ).first()
+    return opening
+
+@router.put("/cash-openings/{opening_id}", response_model=CashOpeningResponse)
+def update_cash_opening(
+    opening_id: int,
+    update_data: CashOpeningUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    opening = db.query(CashOpening).filter(CashOpening.id == opening_id).first()
+    if not opening:
+        raise HTTPException(status_code=404, detail="Opening not found")
+    
+    existing_closing = db.query(CashClosing).filter(CashClosing.opening_id == opening_id).first()
+    if existing_closing:
+        raise HTTPException(status_code=400, detail="No se puede modificar una apertura que ya tiene cierre")
+    
+    if update_data.initial_balance is not None:
+        opening.initial_balance = Decimal(str(update_data.initial_balance))
+    if update_data.notes is not None:
+        opening.notes = update_data.notes
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="update_cash_opening",
+        entity_type="cash_opening",
+        entity_id=opening.id,
+        new_values=f"Updated: balance={update_data.initial_balance}, notes={update_data.notes}"
+    )
+    db.add(audit)
+    
+    db.commit()
+    db.refresh(opening)
     return opening
 
 @router.post("/cash-closings", response_model=CashClosingResponse)

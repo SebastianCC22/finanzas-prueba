@@ -165,15 +165,6 @@ export default function Dashboard() {
                 {stats?.products_low_stock || 0}
               </Badge>
             </div>
-            <div className="flex items-center justify-between p-3 bg-orange-500/10 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-orange-500" />
-                <span>Por Vencer</span>
-              </div>
-              <Badge variant="outline" className="border-orange-500 text-orange-500" data-testid="badge-expiring">
-                {stats?.products_expiring_soon || 0}
-              </Badge>
-            </div>
             <Link href="/inventario">
               <Button variant="outline" className="w-full mt-2" data-testid="button-view-inventory">
                 Ver Inventario

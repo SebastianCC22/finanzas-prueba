@@ -1,110 +1,123 @@
-import { useStore, ACCOUNT_CATEGORIES, AccountCategory } from "@/lib/store";
+import { useState, useEffect } from "react";
+import { useAuthStore } from "@/lib/authStore";
+import { api, CashRegister } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Wallet, Pencil, ChevronDown, Banknote, Smartphone, CreditCard, DollarSign } from "lucide-react";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { Wallet, ChevronDown, Banknote, Smartphone, CreditCard, DollarSign } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
-const accountSchema = z.object({
-  initialBalance: z.coerce.number().min(0, "El saldo debe ser positivo"),
-});
+type PaymentCategory = "efectivo" | "nequi" | "bold" | "daviplata";
 
-const categoryIcons: Record<AccountCategory, React.ReactNode> = {
-  cajas: <Banknote className="h-5 w-5" />,
+const PAYMENT_CATEGORIES: { id: PaymentCategory; label: string }[] = [
+  { id: "efectivo", label: "Efectivo" },
+  { id: "nequi", label: "Nequi" },
+  { id: "bold", label: "Bold" },
+  { id: "daviplata", label: "Daviplata" },
+];
+
+const categoryIcons: Record<PaymentCategory, React.ReactNode> = {
+  efectivo: <Banknote className="h-5 w-5" />,
   nequi: <Smartphone className="h-5 w-5" />,
   bold: <CreditCard className="h-5 w-5" />,
   daviplata: <DollarSign className="h-5 w-5" />,
 };
 
-const categoryColors: Record<AccountCategory, string> = {
-  cajas: 'from-green-500 to-emerald-600',
+const categoryColors: Record<PaymentCategory, string> = {
+  efectivo: 'from-green-500 to-emerald-600',
   nequi: 'from-purple-500 to-violet-600',
   bold: 'from-orange-500 to-amber-600',
   daviplata: 'from-red-500 to-rose-600',
 };
 
-const categoryBgColors: Record<AccountCategory, string> = {
-  cajas: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800',
+const categoryBgColors: Record<PaymentCategory, string> = {
+  efectivo: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800',
   nequi: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800',
   bold: 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800',
   daviplata: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800',
 };
 
 export default function Cuentas() {
-  const { getAccountsByCategory, updateAccountBalance } = useStore();
+  const { currentStore } = useAuthStore();
+  const { toast } = useToast();
+  
+  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
-    cajas: true,
+    efectivo: true,
     nequi: false,
     bold: false,
     daviplata: false,
   });
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<{ id: string; name: string } | null>(null);
 
-  const form = useForm<z.infer<typeof accountSchema>>({
-    resolver: zodResolver(accountSchema),
-    defaultValues: {
-      initialBalance: 0,
-    },
-  });
-
-  function onSubmit(values: z.infer<typeof accountSchema>) {
-    if (editingAccount) {
-      updateAccountBalance(editingAccount.id, values.initialBalance);
+  useEffect(() => {
+    if (currentStore) {
+      loadData();
     }
-    setIsDialogOpen(false);
-    setEditingAccount(null);
-    form.reset();
-  }
+  }, [currentStore]);
 
-  const handleEdit = (account: { id: string; name: string; initialBalance: number }) => {
-    setEditingAccount({ id: account.id, name: account.name });
-    form.reset({
-      initialBalance: account.initialBalance,
-    });
-    setIsDialogOpen(true);
+  const loadData = async () => {
+    if (!currentStore) return;
+    try {
+      const data = await api.getCashRegisters(currentStore.id, true);
+      setCashRegisters(data);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getRegistersByPaymentMethod = (method: PaymentCategory) => {
+    return cashRegisters.filter((r) => r.payment_method === method);
+  };
+
+  const getTotalByCategory = (method: PaymentCategory) => {
+    const registers = getRegistersByPaymentMethod(method);
+    return registers.reduce((sum, r) => sum + r.current_balance, 0);
   };
 
   const toggleCategory = (category: string) => {
-    setOpenCategories(prev => ({
+    setOpenCategories((prev) => ({
       ...prev,
       [category]: !prev[category],
     }));
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
       minimumFractionDigits: 0,
     }).format(value);
   };
 
-  const getTotalByCategory = (category: AccountCategory) => {
-    const accounts = getAccountsByCategory(category);
-    return accounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Mis Cuentas</h1>
-        <p className="text-muted-foreground mt-1">Administra tus cajas por categoría</p>
+        <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">Cajas Registradoras</h1>
+        <p className="text-muted-foreground mt-1">Saldos actuales por método de pago - {currentStore?.name}</p>
       </div>
 
       <div className="space-y-4">
-        {ACCOUNT_CATEGORIES.map((cat) => {
-          const accounts = getAccountsByCategory(cat.id);
+        {PAYMENT_CATEGORIES.map((cat) => {
+          const registers = getRegistersByPaymentMethod(cat.id);
           const total = getTotalByCategory(cat.id);
           const isOpen = openCategories[cat.id];
-          
+
           return (
             <Collapsible key={cat.id} open={isOpen} onOpenChange={() => toggleCategory(cat.id)}>
               <Card className={cn("overflow-hidden transition-all", categoryBgColors[cat.id])}>
@@ -126,45 +139,44 @@ export default function Cuentas() {
                     </div>
                   </CardHeader>
                 </CollapsibleTrigger>
-                
+
                 <CollapsibleContent>
                   <CardContent className="pt-0 pb-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {accounts.map((account) => (
-                        <div 
-                          key={account.id} 
-                          className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-gray-900/50 border shadow-sm"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
-                              <Wallet className="h-4 w-4 text-muted-foreground" />
+                    {registers.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">No hay cajas registradas</p>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {registers.map((register) => (
+                          <div
+                            key={register.id}
+                            className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-gray-900/50 border shadow-sm"
+                            data-testid={`register-${register.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center">
+                                <Wallet className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">{register.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {register.register_type === "mayor" ? "Mayor" : "Menor"}
+                                  </Badge>
+                                  {register.is_global && (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      Global
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium text-sm">{account.tier === 'mayor' ? 'Caja Mayor' : 'Caja Menor'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Base: {formatCurrency(account.initialBalance)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
                             <div className="text-right">
-                              <p className="font-mono font-bold text-lg">{formatCurrency(account.currentBalance)}</p>
+                              <p className="font-mono font-bold text-lg">{formatCurrency(register.current_balance)}</p>
                             </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(account);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </CollapsibleContent>
               </Card>
@@ -172,35 +184,6 @@ export default function Cuentas() {
           );
         })}
       </div>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar {editingAccount?.name}</DialogTitle>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-              <FormField
-                control={form.control}
-                name="initialBalance"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Saldo Base</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="0" {...field} className="font-mono" />
-                    </FormControl>
-                    <FormDescription>
-                      El ajuste del saldo base recalculará el saldo actual.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full">Guardar Cambios</Button>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

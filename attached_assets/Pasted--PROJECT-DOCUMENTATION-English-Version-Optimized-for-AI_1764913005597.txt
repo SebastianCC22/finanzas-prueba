@@ -1,0 +1,411 @@
+✅ PROJECT DOCUMENTATION (English Version – Optimized for AI Implementation)
+
+System POS + Inventory + Cash Control + Multi-Store Management for Natural Products Stores (Python)
+
+🏷️ 1. PROJECT TITLE
+
+POS + Inventory + Cash Management System with Multi-Store Support for Natural Products Shops
+
+🎯 2. GENERAL OBJECTIVE
+
+Develop a professional Python-based application that manages multiple natural-products stores.
+Each store must operate independently, with its own:
+
+Inventory
+
+Cash registers (cashier cash boxes)
+
+Major cash box for physical cash
+
+Sales history
+
+Expenses
+
+Transfer records
+
+Store-specific financial reports
+
+Additionally:
+
+Global major accounts for Nequi, Daviplata, and Bold must be shared across all stores.
+
+The system must include:
+
+POS module
+
+Multi-store inventory
+
+User roles and permissions
+
+Cash and account management
+
+Transfers between stores
+
+Auditing
+
+Reports
+
+Low-stock and expiration alerts
+
+🧑‍💼 3. USER MODULE (ROLES & PERMISSIONS)
+3.1 Roles
+Administrator
+
+Full access
+
+Create and edit stores
+
+Full inventory management
+
+Create and edit users
+
+Global and per-store reports
+
+Manage all major and minor cash boxes
+
+Create new payment methods
+
+Supervisor
+
+View reports and sales
+
+View inventory
+
+Cannot edit or delete inventory
+
+Cannot access major cash boxes
+
+Cannot create users
+
+Cashier
+
+Perform sales
+
+Register expenses
+
+Perform cash transfers between boxes
+
+Open and close cash register
+
+Cannot access full inventory
+
+Cannot view global reports
+
+📜 4. AUDIT LOG SYSTEM
+
+Every action must be recorded with:
+
+Username
+
+Date and time
+
+Store
+
+Action description
+
+Technical details
+
+A dedicated audit review module is required.
+
+🏬 5. MULTI-STORE MODULE
+
+After login, the system must show a store selection menu:
+
+Store Tunal
+
+Store 20 de Julio
+
+Add new store (admin only)
+
+Each store has its own independent:
+
+Inventory
+
+Minor cash boxes
+
+Major cash box (cash only)
+
+Sales history
+
+Expenses
+
+Internal cash transfers
+
+Reports
+
+Global major accounts (shared across all stores):
+
+Nequi (major)
+
+Daviplata (major)
+
+Bold (major)
+
+📊 6. STORE DASHBOARD
+
+After selecting a store, the dashboard must display:
+
+Total income of the day
+
+Total expenses of the day
+
+Daily balance
+
+Out-of-stock products
+
+Low-stock alerts
+
+Quick actions:
+
+Open cash register
+
+Sales
+
+Expenses
+
+Transfers
+
+Inventory
+
+Reports
+
+💰 7. CASH & ACCOUNTS MODULE
+Per-store MINOR cash boxes:
+
+Cash
+
+Nequi
+
+Bold
+
+Daviplata
+
+MAJOR cash boxes:
+
+Major Cash (store-specific)
+
+Major Nequi (global)
+
+Major Daviplata (global)
+
+Major Bold (global)
+
+Features:
+
+View real-time balances
+
+Edit balances (admin only)
+
+Add new payment methods (admin only)
+
+View full history (income, expenses, transfers)
+
+🔓 8. CASH OPENING
+
+Each store must register:
+
+Opening amount (minor cash box)
+
+Date and time
+
+User
+
+Rules:
+
+No sales allowed without prior cash opening
+
+Minor cash resets automatically daily
+
+🛒 9. POS / SALES MODULE
+Sales form fields:
+
+Product search
+
+Quantity
+
+Price auto-filled from inventory (editable for discounts)
+
+Payment methods:
+
+Cash
+
+Nequi
+
+Daviplata
+
+Bold
+
+Mixed payments (e.g., cash + Nequi)
+
+Description for non-inventory items
+
+Automatic date and time
+
+User who processed the sale
+
+Automatic actions:
+
+Reduce product inventory
+
+Register sale in sales history
+
+Add money to correct minor cash box
+
+Save user + timestamp
+
+Additional features:
+
+Search sales
+
+Filter by user, method, date, product
+
+Export to PDF / Excel
+
+🔄 10. RETURNS MODULE
+
+System must allow:
+
+Full or partial return
+
+Select original sale
+
+Reason for return
+
+Restore inventory
+
+Deduct money from the correct cash box
+
+Register user + timestamp
+
+📦 11. ADVANCED INVENTORY MODULE
+Product fields:
+
+Name
+
+Brand
+
+Supplier
+
+Sale price
+
+Cost
+
+Quantity
+
+Presentation (liquid, powder, tablets, capsules, cream, gel, ointment, etc.)
+
+Weight/volume
+
+VAT (yes/no)
+
+Expiration date
+
+Minimum stock
+
+Functions:
+
+Add, edit, delete products (admin only)
+
+Advanced filters:
+
+brand, supplier, presentation, VAT, near expiration
+
+Fast search bar
+
+Low-stock alerts
+
+Expiration alerts
+
+Export inventory
+
+Inventory change history
+
+🔀 12. STORE-TO-STORE PRODUCT TRANSFERS
+
+Must allow:
+
+Select origin store
+
+Select destination store
+
+Search product(s)
+
+Choose quantities
+
+Must log:
+
+User
+
+Date and time
+
+Reason
+
+Actions:
+
+Subtract inventory from origin
+
+Add inventory to destination
+
+⚠️ Does NOT affect cash boxes (not sales).
+
+📉 13. EXPENSES MODULE (EGRESOS)
+Fields:
+
+Amount
+
+Payment method
+
+Select cash box (major or minor)
+
+Description
+
+Date
+
+User
+
+Automatic:
+
+Deduct money from selected cash box
+
+Save record in expenses history
+
+📊 14. REPORTS MODULE
+Types:
+
+Store-specific reports
+
+Global reports
+
+Sales report
+
+Expenses report
+
+Inventory report
+
+Cash movements report
+
+Transfers report
+
+Store-to-store product transfers
+
+Audit logs report
+
+Filters:
+
+Store
+
+User
+
+Date range
+
+Payment method
+
+Product
+
+Operation type
+
+Export to:
+
+PDF
+
+Excel
