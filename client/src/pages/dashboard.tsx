@@ -1,55 +1,65 @@
-import { useStore } from "@/lib/store";
+import { useEffect, useState } from "react";
+import { useAuthStore } from "@/lib/authStore";
+import { api, DashboardStats, Alert } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowUpCircle, ArrowDownCircle, Wallet, TrendingUp, TrendingDown, Download, FileCode, Store } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
+import {
+  ShoppingCart, ArrowDownCircle, Wallet, TrendingUp,
+  Package, AlertTriangle, Clock, Bell, Store,
+  DollarSign, BarChart3, FileText
+} from "lucide-react";
 
 export default function Dashboard() {
-  const { getStoreTransactions, getStoreAccounts, currentStore } = useStore();
-  const transactions = getStoreTransactions();
-  const accounts = getStoreAccounts();
+  const { currentStore, user } = useAuthStore();
+  const { toast } = useToast();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Filter accounts included in total for balance calculation
-  const activeAccounts = accounts.filter(a => a.includeInTotal);
-  const activeAccountIds = activeAccounts.map(a => a.id);
+  useEffect(() => {
+    if (currentStore) {
+      loadData();
+    }
+  }, [currentStore]);
 
-  const totalIncome = transactions
-    .filter(t => t.type === 'ingreso' && activeAccountIds.includes(t.accountId))
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const totalExpense = transactions
-    .filter(t => t.type === 'egreso' && activeAccountIds.includes(t.accountId))
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const realTotalBalance = activeAccounts.reduce((acc, a) => acc + a.currentBalance, 0);
+  const loadData = async () => {
+    if (!currentStore) return;
+    try {
+      const [statsData, alertsData] = await Promise.all([
+        api.getDashboardStats(currentStore.id),
+        api.getAlerts(currentStore.id, true),
+      ]);
+      setStats(statsData);
+      setAlerts(alertsData.slice(0, 5));
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
       minimumFractionDigits: 0,
     }).format(value);
   };
 
-  // Chart Data: Income by Method
-  const incomeByMethod = transactions
-    .filter(t => t.type === 'ingreso' && activeAccountIds.includes(t.accountId))
-    .reduce((acc, t) => {
-      const key = t.method; 
-      acc[key] = (acc[key] || 0) + t.amount;
-      return acc;
-    }, {} as Record<string, number>);
-    
-  const incomeData = Object.entries(incomeByMethod).map(([name, value]) => ({ name, value }));
-
-  // Chart Data: Balance vs Income vs Expense
-  const balanceStats = [
-    { name: 'Ingresos', value: totalIncome, color: 'hsl(160 60% 45%)' },
-    { name: 'Egresos', value: totalExpense, color: 'hsl(0 84.2% 60.2%)' },
-    { name: 'Balance', value: realTotalBalance, color: 'hsl(221 83% 53%)' }
-  ];
-
-  const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -57,130 +67,191 @@ export default function Dashboard() {
         <div>
           <div className="flex items-center gap-2 text-primary mb-1">
             <Store className="h-4 w-4" />
-            <span className="text-sm font-semibold uppercase tracking-wider">{currentStore}</span>
+            <span className="text-sm font-semibold uppercase tracking-wider">
+              {currentStore?.name}
+            </span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Inicio</h1>
-          <p className="text-muted-foreground mt-1">Resumen general de tu actividad</p>
+          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-welcome">
+            Bienvenido, {user?.full_name || user?.username}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Resumen general de tu actividad
+          </p>
         </div>
-        
-        <a href="/finanzas_pro_source.zip" download>
-          <Button variant="outline" className="gap-2 border-primary/20 text-primary hover:bg-primary/5">
-            <FileCode className="h-4 w-4" />
-            Descargar App Python
-          </Button>
-        </a>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-gradient-to-br from-sidebar-primary to-blue-600 text-white border-none shadow-lg shadow-blue-500/20">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-none shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-emerald-100">
+              Ventas Hoy
+            </CardTitle>
+            <ShoppingCart className="h-4 w-4 text-emerald-100" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono" data-testid="text-sales-today">
+              {formatCurrency(stats?.total_sales_today || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-blue-100">
-              Balance Total
+              Ventas Semana
             </CardTitle>
-            <Wallet className="h-4 w-4 text-blue-100" />
+            <TrendingUp className="h-4 w-4 text-blue-100" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold font-mono tracking-tight">{formatCurrency(realTotalBalance)}</div>
-            <p className="text-xs text-blue-200 mt-1">
-              Total en cuentas activas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Ingresos Totales
-            </CardTitle>
-            <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-emerald-600">+{formatCurrency(totalIncome)}</div>
-            <div className="flex items-center text-xs text-emerald-600 mt-1">
-              <TrendingUp className="h-3 w-3 mr-1" /> Recaudado
+            <div className="text-2xl font-bold font-mono" data-testid="text-sales-week">
+              {formatCurrency(stats?.total_sales_week || 0)}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-none shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Egresos Totales
+            <CardTitle className="text-sm font-medium text-purple-100">
+              Ventas Mes
             </CardTitle>
-            <ArrowDownCircle className="h-4 w-4 text-rose-500" />
+            <BarChart3 className="h-4 w-4 text-purple-100" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-rose-600">-{formatCurrency(totalExpense)}</div>
-            <div className="flex items-center text-xs text-rose-600 mt-1">
-              <TrendingDown className="h-3 w-3 mr-1" /> Gastado
+            <div className="text-2xl font-bold font-mono" data-testid="text-sales-month">
+              {formatCurrency(stats?.total_sales_month || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-rose-500 to-rose-600 text-white border-none shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-rose-100">
+              Egresos Hoy
+            </CardTitle>
+            <ArrowDownCircle className="h-4 w-4 text-rose-100" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono" data-testid="text-expenses-today">
+              {formatCurrency(stats?.total_expenses_today || 0)}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        
-        {/* Distribución de Saldos */}
-        <Card className="shadow-lg hover:shadow-xl transition-shadow">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Distribución de Saldos</CardTitle>
-            <CardDescription>Dinero en cada cuenta</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Estado del Inventario
+            </CardTitle>
           </CardHeader>
-          <CardContent className="pl-2">
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={accounts} layout="vertical" margin={{left: 0}}>
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 11}} />
-                  <Tooltip 
-                    formatter={(value: number) => formatCurrency(value)}
-                    cursor={{ fill: 'transparent' }}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                  <Bar dataKey="currentBalance" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} name="Saldo" />
-                </BarChart>
-              </ResponsiveContainer>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <span>Agotados</span>
+              </div>
+              <Badge variant="destructive" data-testid="badge-out-of-stock">
+                {stats?.products_out_of_stock || 0}
+              </Badge>
             </div>
+            <div className="flex items-center justify-between p-3 bg-amber-500/10 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-amber-500" />
+                <span>Stock Bajo</span>
+              </div>
+              <Badge variant="outline" className="border-amber-500 text-amber-500" data-testid="badge-low-stock">
+                {stats?.products_low_stock || 0}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-orange-500/10 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-orange-500" />
+                <span>Por Vencer</span>
+              </div>
+              <Badge variant="outline" className="border-orange-500 text-orange-500" data-testid="badge-expiring">
+                {stats?.products_expiring_soon || 0}
+              </Badge>
+            </div>
+            <Link href="/inventario">
+              <Button variant="outline" className="w-full mt-2" data-testid="button-view-inventory">
+                Ver Inventario
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
-        {/* Ingresos por Método */}
-        <Card className="shadow-lg hover:shadow-xl transition-shadow">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Ingresos por Método</CardTitle>
-            <CardDescription>Entradas por canal de pago</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Alertas Recientes
+              {(stats?.unread_alerts || 0) > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {stats?.unread_alerts}
+                </Badge>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[400px] w-full flex items-center justify-center">
-              {incomeData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={incomeData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {incomeData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                    <Legend verticalAlign="bottom" height={36}/>
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-muted-foreground text-sm">No hay datos de ingresos</div>
-              )}
-            </div>
+            {alerts.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">
+                No hay alertas pendientes
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {alerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="p-3 bg-muted rounded-lg"
+                    data-testid={`alert-${alert.id}`}
+                  >
+                    <p className="font-medium text-sm">{alert.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {alert.message?.slice(0, 60)}...
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Acciones Rápidas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Link href="/ventas">
+              <Button className="w-full justify-start" variant="default" data-testid="button-new-sale">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Nueva Venta
+              </Button>
+            </Link>
+            <Link href="/apertura">
+              <Button className="w-full justify-start" variant="outline" data-testid="button-open-cash">
+                <Wallet className="h-4 w-4 mr-2" />
+                Apertura de Caja
+              </Button>
+            </Link>
+            <Link href="/cierre">
+              <Button className="w-full justify-start" variant="outline" data-testid="button-close-cash">
+                <FileText className="h-4 w-4 mr-2" />
+                Cierre de Caja
+              </Button>
+            </Link>
+            <Link href="/reportes">
+              <Button className="w-full justify-start" variant="outline" data-testid="button-reports">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Ver Reportes
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

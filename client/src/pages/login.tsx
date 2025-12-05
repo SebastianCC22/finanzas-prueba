@@ -1,56 +1,120 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
-import { useStore } from "@/lib/store";
+import { useAuthStore } from "@/lib/authStore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Store, ShoppingBag } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Store, Lock, User } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
-  const login = useStore((state) => state.login);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const login = useAuthStore((state) => state.login);
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
-  const handleLogin = (storeName: string) => {
-    login(storeName);
-    // Use a timeout to allow state to update before navigation
-    // This helps prevent hook mismatch errors if re-renders happen
-    setTimeout(() => setLocation("/"), 0);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username || !password) {
+      toast({
+        title: "Error",
+        description: "Por favor ingrese usuario y contraseña",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await login(username, password);
+      toast({
+        title: "Bienvenido",
+        description: "Inicio de sesión exitoso",
+      });
+      setTimeout(() => setLocation("/"), 0);
+    } catch (error: any) {
+      toast({
+        title: "Error de acceso",
+        description: error.message || "Usuario o contraseña incorrectos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
       <div className="absolute inset-0 bg-grid-slate-200/60 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/30 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]" />
       
-      <Card className="w-full max-w-2xl relative z-10 shadow-2xl border-border/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90">
-        <CardHeader className="text-center space-y-4 pb-8 border-b">
+      <Card className="w-full max-w-md relative z-10 shadow-2xl border-border/50 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90">
+        <CardHeader className="text-center space-y-4 pb-6 border-b">
           <div className="mx-auto h-16 w-16 rounded-2xl bg-primary flex items-center justify-center mb-2 shadow-lg shadow-primary/30">
             <Store className="h-8 w-8 text-primary-foreground" />
           </div>
           <div>
-            <CardTitle className="text-3xl font-bold tracking-tight mb-2">Finanzas Rincon Integral</CardTitle>
-            <CardDescription className="text-lg">Seleccione la tienda para operar</CardDescription>
+            <CardTitle className="text-2xl font-bold tracking-tight mb-2" data-testid="text-title">
+              Finanzas Rincon Integral
+            </CardTitle>
+            <CardDescription className="text-base">
+              Sistema de gestión de tiendas naturistas
+            </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="pt-8 pb-8">
-          <div className="grid md:grid-cols-2 gap-6">
-            <button
-              onClick={() => handleLogin("20 de Julio")}
-              className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-muted hover:border-primary/50 bg-card hover:bg-accent/5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
-            >
-              <div className="h-16 w-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <ShoppingBag className="h-8 w-8" />
+        <CardContent className="pt-6 pb-6">
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Usuario</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Ingrese su usuario"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-username"
+                  disabled={isLoading}
+                />
               </div>
-              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">20 de Julio</h3>
-              <p className="text-sm text-muted-foreground mt-2">Ingresar al panel</p>
-            </button>
-
-            <button
-              onClick={() => handleLogin("Tunal")}
-              className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-muted hover:border-primary/50 bg-card hover:bg-accent/5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
-            >
-              <div className="h-16 w-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <ShoppingBag className="h-8 w-8" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Ingrese su contraseña"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-password"
+                  disabled={isLoading}
+                />
               </div>
-              <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">Tunal</h3>
-              <p className="text-sm text-muted-foreground mt-2">Ingresar al panel</p>
-            </button>
+            </div>
+            <Button
+              type="submit"
+              className="w-full mt-6"
+              size="lg"
+              disabled={isLoading}
+              data-testid="button-login"
+            >
+              {isLoading ? "Ingresando..." : "Ingresar"}
+            </Button>
+          </form>
+          <div className="mt-6 pt-4 border-t text-center">
+            <p className="text-sm text-muted-foreground">
+              Usuario por defecto: <span className="font-mono text-foreground">admin</span>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Contraseña: <span className="font-mono text-foreground">admin123</span>
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -1,26 +1,49 @@
+import { useEffect, useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
-import { useStore } from "@/lib/store";
+import { useAuthStore } from "@/lib/authStore";
 
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
-import Movements from "@/pages/movements";
-import Cuentas from "@/pages/cuentas";
-import Apertura from "@/pages/apertura";
-import Cierre from "@/pages/cierre";
+import Ventas from "@/pages/ventas";
+import Devoluciones from "@/pages/devoluciones";
+import Egresos from "@/pages/egresos";
+import TraspasosProductos from "@/pages/traspasos-productos";
 import Transferencias from "@/pages/transferencias";
 import Inventario from "@/pages/inventario";
+import Apertura from "@/pages/apertura";
+import Cierre from "@/pages/cierre";
+import Reportes from "@/pages/reportes";
 import Layout from "@/components/layout";
 import NotFound from "@/pages/not-found";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
-  const isAuthenticated = useStore((state) => state.isAuthenticated);
+  const { isAuthenticated, checkAuth } = useAuthStore();
   const [, setLocation] = useLocation();
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const verify = async () => {
+      const valid = await checkAuth();
+      if (!valid) {
+        setLocation("/login");
+      }
+      setIsChecking(false);
+    };
+    verify();
+  }, []);
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
-    setTimeout(() => setLocation("/login"), 0);
     return null;
   }
 
@@ -32,53 +55,65 @@ function PrivateRoute({ component: Component, ...rest }: any) {
 }
 
 function Router() {
-  const isAuthenticated = useStore((state) => state.isAuthenticated);
+  const { isAuthenticated, checkAuth } = useAuthStore();
   const [, setLocation] = useLocation();
-  
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
   return (
     <Switch>
       <Route path="/login">
         {() => {
-           if (isAuthenticated) {
-             setTimeout(() => setLocation("/"), 0);
-             return null;
-           }
-           return <Login />;
+          if (isAuthenticated) {
+            setTimeout(() => setLocation("/"), 0);
+            return null;
+          }
+          return <Login />;
         }}
       </Route>
-      
+
       <Route path="/">
         {() => <PrivateRoute component={Dashboard} />}
       </Route>
-      
-      <Route path="/ingresos">
-        {() => <PrivateRoute component={() => <Movements type="ingreso" />} />}
+
+      <Route path="/ventas">
+        {() => <PrivateRoute component={Ventas} />}
       </Route>
-      
+
+      <Route path="/devoluciones">
+        {() => <PrivateRoute component={Devoluciones} />}
+      </Route>
+
       <Route path="/egresos">
-        {() => <PrivateRoute component={() => <Movements type="egreso" />} />}
+        {() => <PrivateRoute component={Egresos} />}
       </Route>
-      
-      <Route path="/cuentas">
-        {() => <PrivateRoute component={Cuentas} />}
+
+      <Route path="/traspasos-productos">
+        {() => <PrivateRoute component={TraspasosProductos} />}
       </Route>
-      
-      <Route path="/apertura">
-        {() => <PrivateRoute component={Apertura} />}
-      </Route>
-      
-      <Route path="/cierre">
-        {() => <PrivateRoute component={Cierre} />}
-      </Route>
-      
+
       <Route path="/transferencias">
         {() => <PrivateRoute component={Transferencias} />}
       </Route>
-      
+
       <Route path="/inventario">
         {() => <PrivateRoute component={Inventario} />}
       </Route>
-      
+
+      <Route path="/apertura">
+        {() => <PrivateRoute component={Apertura} />}
+      </Route>
+
+      <Route path="/cierre">
+        {() => <PrivateRoute component={Cierre} />}
+      </Route>
+
+      <Route path="/reportes">
+        {() => <PrivateRoute component={Reportes} />}
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );
