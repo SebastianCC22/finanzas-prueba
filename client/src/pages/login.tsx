@@ -22,7 +22,7 @@ export default function Login() {
     if (!role || !password) {
       toast({
         title: "Error",
-        description: "Por favor seleccione un rol e ingrese la contraseña",
+        description: "Por favor seleccione un usuario e ingrese la contraseña",
         variant: "destructive",
       });
       return;
@@ -38,11 +38,11 @@ export default function Login() {
       });
       setTimeout(() => setLocation("/"), 0);
     } catch (error: any) {
-      let errorMessage = "Rol o contraseña incorrectos";
+      let errorMessage = "Usuario o contraseña incorrectos";
       
       if (error.message) {
         if (error.message.includes("401") || error.message.includes("Unauthorized")) {
-          errorMessage = "Rol o contraseña incorrectos";
+          errorMessage = "Usuario o contraseña incorrectos";
         } else if (error.message.includes("Invalid credentials")) {
           errorMessage = "Credenciales inválidas";
         } else if (error.message.includes("not found")) {
