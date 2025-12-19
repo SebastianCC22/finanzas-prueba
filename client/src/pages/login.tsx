@@ -38,9 +38,21 @@ export default function Login() {
       });
       setTimeout(() => setLocation("/"), 0);
     } catch (error: any) {
+      let errorMessage = "Rol o contraseña incorrectos";
+      
+      if (error.message) {
+        if (error.message.includes("401") || error.message.includes("Unauthorized")) {
+          errorMessage = "Rol o contraseña incorrectos";
+        } else if (error.message.includes("Invalid credentials")) {
+          errorMessage = "Credenciales inválidas";
+        } else if (error.message.includes("not found")) {
+          errorMessage = "Usuario no encontrado";
+        }
+      }
+      
       toast({
         title: "Error de acceso",
-        description: error.message || "Rol o contraseña incorrectos",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

@@ -29,11 +29,13 @@ function PrivateRoute({ component: Component, ...rest }: any) {
       const valid = await checkAuth();
       if (!valid) {
         setLocation("/login");
+        setIsChecking(false);
+        return;
       }
       setIsChecking(false);
     };
     verify();
-  }, []);
+  }, [setLocation]);
 
   if (isChecking) {
     return (
@@ -44,6 +46,7 @@ function PrivateRoute({ component: Component, ...rest }: any) {
   }
 
   if (!isAuthenticated) {
+    setLocation("/login");
     return null;
   }
 
