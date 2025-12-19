@@ -108,14 +108,6 @@ export default function Login() {
               {isLoading ? "Ingresando..." : "Ingresar"}
             </Button>
           </form>
-          <div className="mt-6 pt-4 border-t text-center">
-            <p className="text-sm text-muted-foreground">
-              Usuario por defecto: <span className="font-mono text-foreground">admin</span>
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Contraseña: <span className="font-mono text-foreground">admin123</span>
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
