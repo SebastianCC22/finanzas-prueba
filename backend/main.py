@@ -19,18 +19,31 @@ async def lifespan(app: FastAPI):
     
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.username == "admin").first()
+        admin = db.query(User).filter(User.username == "Administrador").first()
         if not admin:
             admin = User(
-                username="admin",
+                username="Administrador",
                 email="admin@example.com",
-                password_hash=get_password_hash("admin123"),
+                password_hash=get_password_hash("Rarerimolero71"),
                 full_name="Administrador",
                 role="admin"
             )
             db.add(admin)
             db.commit()
-            print("Default admin user created: admin / admin123")
+            print("Default admin user created: Administrador")
+        
+        cajero = db.query(User).filter(User.username == "Cajero").first()
+        if not cajero:
+            cajero = User(
+                username="Cajero",
+                email="cajero@example.com",
+                password_hash=get_password_hash("1234"),
+                full_name="Cajero",
+                role="seller"
+            )
+            db.add(cajero)
+            db.commit()
+            print("Default cajero user created: Cajero")
         
         stores = db.query(Store).all()
         if not stores:

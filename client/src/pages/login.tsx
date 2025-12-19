@@ -81,7 +81,7 @@ export default function Login() {
         <CardContent className="pt-6 pb-6">
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="role">Rol</Label>
+              <Label htmlFor="role">Usuario</Label>
               <Select value={role} onValueChange={setRole} disabled={isLoading}>
                 <SelectTrigger id="role" data-testid="select-role">
                   <SelectValue />
