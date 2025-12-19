@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Store, Lock, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
-  const [username, setUsername] = useState("");
+  const [role, setRole] = useState("cajero");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const login = useAuthStore((state) => state.login);
@@ -18,10 +19,10 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
+    if (!role || !password) {
       toast({
         title: "Error",
-        description: "Por favor ingrese usuario y contraseña",
+        description: "Por favor seleccione un rol e ingrese la contraseña",
         variant: "destructive",
       });
       return;
@@ -29,6 +30,7 @@ export default function Login() {
 
     setIsLoading(true);
     try {
+      const username = role === "cajero" ? "Cajero" : "Administrador";
       await login(username, password);
       toast({
         title: "Bienvenido",
@@ -38,7 +40,7 @@ export default function Login() {
     } catch (error: any) {
       toast({
         title: "Error de acceso",
-        description: error.message || "Usuario o contraseña incorrectos",
+        description: error.message || "Rol o contraseña incorrectos",
         variant: "destructive",
       });
     } finally {
@@ -67,20 +69,16 @@ export default function Login() {
         <CardContent className="pt-6 pb-6">
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Usuario</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="Ingrese su usuario"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-username"
-                  disabled={isLoading}
-                />
-              </div>
+              <Label htmlFor="role">Rol</Label>
+              <Select value={role} onValueChange={setRole} disabled={isLoading}>
+                <SelectTrigger id="role" data-testid="select-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cajero">Cajero</SelectItem>
+                  <SelectItem value="administrador">Administrador</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
