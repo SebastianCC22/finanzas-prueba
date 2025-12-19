@@ -119,24 +119,28 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                <span>Agotados</span>
-              </div>
-              <Badge variant="destructive" data-testid="badge-out-of-stock">
-                {stats?.products_out_of_stock || 0}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-amber-500/10 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-amber-500" />
-                <span>Stock Bajo</span>
-              </div>
-              <Badge variant="outline" className="border-amber-500 text-amber-500" data-testid="badge-low-stock">
-                {stats?.products_low_stock || 0}
-              </Badge>
-            </div>
+            <Link href="/inventario?filter=out_of_stock">
+              <button className="w-full flex items-center justify-between p-3 bg-destructive/10 rounded-lg hover:bg-destructive/20 transition-colors cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <span>Agotados</span>
+                </div>
+                <Badge variant="destructive" data-testid="badge-out-of-stock">
+                  {stats?.products_out_of_stock || 0}
+                </Badge>
+              </button>
+            </Link>
+            <Link href="/inventario?filter=low_stock">
+              <button className="w-full flex items-center justify-between p-3 bg-amber-500/10 rounded-lg hover:bg-amber-500/20 transition-colors cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-amber-500" />
+                  <span>Stock Bajo</span>
+                </div>
+                <Badge variant="outline" className="border-amber-500 text-amber-500" data-testid="badge-low-stock">
+                  {stats?.products_low_stock || 0}
+                </Badge>
+              </button>
+            </Link>
             <Link href="/inventario">
               <Button variant="outline" className="w-full mt-2" data-testid="button-view-inventory">
                 Ver Inventario

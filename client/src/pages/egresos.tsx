@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { DollarSign, Plus, History, Download } from "lucide-react";
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 const PAYMENT_METHODS = [
   { id: "efectivo", label: "Efectivo" },
@@ -117,12 +118,12 @@ export default function Egresos() {
 
   const exportExpenses = () => {
     if (!currentStore) return;
-    const url = api.getExportUrl("expenses", "excel", { store_id: currentStore.id.toString() });
+    const url = api.getExportUrl("expenses", "pdf", { store_id: currentStore.id.toString() });
     window.open(url, "_blank");
   };
 
   const totalExpensesToday = expenses
-    .filter((e) => format(new Date(e.created_at), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd"))
+    .filter((e) => formatInTimeZone(new Date(e.created_at), "America/Bogota", "yyyy-MM-dd") === formatInTimeZone(new Date(), "America/Bogota", "yyyy-MM-dd"))
     .reduce((sum, e) => sum + e.amount, 0);
 
   return (
@@ -227,7 +228,7 @@ export default function Egresos() {
                   {expenses.map((expense) => (
                     <TableRow key={expense.id} data-testid={`row-expense-${expense.id}`}>
                       <TableCell>
-                        {format(new Date(expense.created_at), "dd/MM/yyyy HH:mm")}
+                        {formatInTimeZone(new Date(expense.created_at), "America/Bogota", "dd/MM/yyyy HH:mm")}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
