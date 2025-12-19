@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useAuthStore } from "@/lib/authStore";
 
 import Login from "@/pages/login";
+import SelectStore from "@/pages/select-store";
 import Dashboard from "@/pages/dashboard";
 import Ventas from "@/pages/ventas";
 import Devoluciones from "@/pages/devoluciones";
@@ -19,8 +20,8 @@ import Reportes from "@/pages/reportes";
 import Layout from "@/components/layout";
 import NotFound from "@/pages/not-found";
 
-function PrivateRoute({ component: Component, ...rest }: any) {
-  const { isAuthenticated, checkAuth } = useAuthStore();
+function PrivateRoute({ component: Component, requireStore = true, ...rest }: any) {
+  const { isAuthenticated, checkAuth, currentStore } = useAuthStore();
   const [, setLocation] = useLocation();
   const [isChecking, setIsChecking] = useState(true);
 
@@ -50,6 +51,11 @@ function PrivateRoute({ component: Component, ...rest }: any) {
     return null;
   }
 
+  if (requireStore && !currentStore) {
+    setLocation("/select-store");
+    return null;
+  }
+
   return (
     <Layout>
       <Component {...rest} />
@@ -70,10 +76,20 @@ function Router() {
       <Route path="/login">
         {() => {
           if (isAuthenticated) {
-            setTimeout(() => setLocation("/"), 0);
+            setTimeout(() => setLocation("/select-store"), 0);
             return null;
           }
           return <Login />;
+        }}
+      </Route>
+
+      <Route path="/select-store">
+        {() => {
+          if (!isAuthenticated) {
+            setTimeout(() => setLocation("/login"), 0);
+            return null;
+          }
+          return <SelectStore />;
         }}
       </Route>
 

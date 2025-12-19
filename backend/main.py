@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from contextlib import asynccontextmanager
 
 from backend.models.database import engine, Base, SessionLocal
@@ -119,8 +119,8 @@ def download_source():
     """Download the entire source code as a ZIP file"""
     buffer = io.BytesIO()
     
-    exclude_dirs = {'.git', 'node_modules', '__pycache__', 'dist', '.cache', '.upm', '.pythonlibs', 'venv', '.venv'}
-    exclude_extensions = {'.pyc', '.pyo', '.db', '.sqlite', '.log'}
+    exclude_dirs = {'.git', 'node_modules', '__pycache__', 'dist', '.cache', '.upm', '.pythonlibs', 'venv', '.venv', '.config', '.local'}
+    exclude_extensions = {'.pyc', '.pyo', '.db', '.sqlite', '.log', '.lock'}
     
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         for root, dirs, files in os.walk('.'):
@@ -136,13 +136,14 @@ def download_source():
                 arcname = file_path[2:] if file_path.startswith('./') else file_path
                 
                 try:
-                    zf.write(file_path, arcname)
+                    with open(file_path, 'rb') as f:
+                        zf.writestr(arcname, f.read())
                 except Exception:
                     pass
     
-    buffer.seek(0)
-    return StreamingResponse(
-        buffer,
+    zip_bytes = buffer.getvalue()
+    return Response(
+        content=zip_bytes,
         media_type="application/zip",
         headers={"Content-Disposition": "attachment; filename=finanzas-rincon-integral.zip"}
     )
