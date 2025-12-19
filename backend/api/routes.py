@@ -24,7 +24,8 @@ from backend.api.schemas import (
     CashTransferCreate, CashTransferResponse,
     CashOpeningCreate, CashOpeningResponse, CashOpeningUpdate,
     CashClosingCreate, CashClosingResponse, CashClosingUpdate,
-    AlertResponse, StockMovementResponse, DashboardStats
+    AlertResponse, StockMovementResponse, DashboardStats,
+    PaymentMethodStats, StoreStats, TopProduct, AdvancedStats
 )
 from backend.services.auth import (
     get_password_hash, verify_password, create_access_token,
@@ -1021,15 +1022,45 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
     
     sales_query = db.query(func.coalesce(func.sum(Sale.total), 0))
     expenses_query = db.query(func.coalesce(func.sum(Expense.amount), 0))
+    sales_count_query = db.query(func.count(Sale.id))
     
     if store_id:
         sales_query = sales_query.filter(Sale.store_id == store_id)
         expenses_query = expenses_query.filter(Expense.store_id == store_id)
+        sales_count_query = sales_count_query.filter(Sale.store_id == store_id)
     
     total_sales_today = sales_query.filter(func.date(Sale.created_at) == today).scalar()
     total_sales_week = sales_query.filter(Sale.created_at >= week_ago).scalar()
     total_sales_month = sales_query.filter(Sale.created_at >= month_ago).scalar()
+    
     total_expenses_today = expenses_query.filter(func.date(Expense.created_at) == today).scalar()
+    total_expenses_week = expenses_query.filter(Expense.created_at >= week_ago).scalar()
+    total_expenses_month = expenses_query.filter(Expense.created_at >= month_ago).scalar()
+    
+    sales_count_today = sales_count_query.filter(func.date(Sale.created_at) == today).scalar()
+    sales_count_week = sales_count_query.filter(Sale.created_at >= week_ago).scalar()
+    sales_count_month = sales_count_query.filter(Sale.created_at >= month_ago).scalar()
+    
+    cost_base_query = db.query(
+        func.coalesce(func.sum(Product.cost * SaleItem.quantity), 0)
+    ).select_from(SaleItem).join(Sale).outerjoin(
+        Product, SaleItem.product_id == Product.id
+    )
+    
+    if store_id:
+        cost_base_query = cost_base_query.filter(Sale.store_id == store_id)
+    
+    cost_today = float(cost_base_query.filter(func.date(Sale.created_at) == today).scalar() or 0)
+    cost_week = float(cost_base_query.filter(Sale.created_at >= week_ago).scalar() or 0)
+    cost_month = float(cost_base_query.filter(Sale.created_at >= month_ago).scalar() or 0)
+    
+    profit_today = float(total_sales_today or 0) - cost_today - float(total_expenses_today or 0)
+    profit_week = float(total_sales_week or 0) - cost_week - float(total_expenses_week or 0)
+    profit_month = float(total_sales_month or 0) - cost_month - float(total_expenses_month or 0)
+    
+    average_ticket = 0
+    if sales_count_month and sales_count_month > 0:
+        average_ticket = float(total_sales_month or 0) / sales_count_month
     
     products_query = db.query(Product).filter(Product.is_active == True)
     if store_id:
@@ -1048,6 +1079,10 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
         Product.expiration_date <= expiration_threshold
     ).count()
     
+    inventory_value = float(products_query.with_entities(
+        func.coalesce(func.sum(Product.cost * Product.quantity), 0)
+    ).scalar() or 0)
+    
     alerts_query = db.query(Alert).filter(Alert.is_read == False, Alert.is_resolved == False)
     if store_id:
         alerts_query = alerts_query.filter((Alert.store_id == store_id) | (Alert.store_id == None))
@@ -1058,10 +1093,134 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
         total_sales_week=float(total_sales_week or 0),
         total_sales_month=float(total_sales_month or 0),
         total_expenses_today=float(total_expenses_today or 0),
+        total_expenses_week=float(total_expenses_week or 0),
+        total_expenses_month=float(total_expenses_month or 0),
         products_low_stock=products_low_stock,
         products_out_of_stock=products_out_of_stock,
         products_expiring_soon=products_expiring_soon,
-        unread_alerts=unread_alerts
+        unread_alerts=unread_alerts,
+        profit_today=profit_today,
+        profit_week=profit_week,
+        profit_month=profit_month,
+        cost_today=cost_today,
+        cost_week=cost_week,
+        cost_month=cost_month,
+        sales_count_today=sales_count_today or 0,
+        sales_count_week=sales_count_week or 0,
+        sales_count_month=sales_count_month or 0,
+        average_ticket=average_ticket,
+        inventory_value=inventory_value
+    )
+
+@router.get("/dashboard/advanced-stats", response_model=AdvancedStats)
+def get_advanced_stats(
+    store_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ver estadísticas avanzadas")
+    
+    month_ago = datetime.now() - timedelta(days=30)
+    
+    payment_query = db.query(
+        Payment.payment_method,
+        func.sum(Payment.amount).label('total'),
+        func.count(Payment.id).label('count')
+    ).join(Sale).filter(Sale.created_at >= month_ago)
+    
+    if store_id:
+        payment_query = payment_query.filter(Sale.store_id == store_id)
+    
+    payment_results = payment_query.group_by(Payment.payment_method).all()
+    
+    total_payments = sum(float(r.total or 0) for r in payment_results)
+    payment_stats = []
+    for r in payment_results:
+        pct = (float(r.total or 0) / total_payments * 100) if total_payments > 0 else 0
+        payment_stats.append(PaymentMethodStats(
+            payment_method=r.payment_method,
+            total_amount=float(r.total or 0),
+            transaction_count=r.count,
+            percentage=round(pct, 1)
+        ))
+    
+    stores_query = db.query(Store).filter(Store.is_active == True)
+    if store_id:
+        stores_query = stores_query.filter(Store.id == store_id)
+    stores = stores_query.all()
+    store_stats = []
+    for store in stores:
+        sales_total = db.query(func.coalesce(func.sum(Sale.total), 0)).filter(
+            Sale.store_id == store.id,
+            Sale.created_at >= month_ago
+        ).scalar()
+        expenses_total = db.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
+            Expense.store_id == store.id,
+            Expense.created_at >= month_ago
+        ).scalar()
+        sales_count = db.query(func.count(Sale.id)).filter(
+            Sale.store_id == store.id,
+            Sale.created_at >= month_ago
+        ).scalar()
+        
+        cost_total = float(db.query(
+            func.coalesce(func.sum(Product.cost * SaleItem.quantity), 0)
+        ).select_from(SaleItem).join(Sale).outerjoin(
+            Product, SaleItem.product_id == Product.id
+        ).filter(
+            Sale.store_id == store.id,
+            Sale.created_at >= month_ago
+        ).scalar() or 0)
+        
+        profit = float(sales_total or 0) - cost_total - float(expenses_total or 0)
+        
+        store_stats.append(StoreStats(
+            store_id=store.id,
+            store_name=store.name,
+            total_sales=float(sales_total or 0),
+            total_expenses=float(expenses_total or 0),
+            profit=profit,
+            sales_count=sales_count or 0
+        ))
+    
+    top_products_query = db.query(
+        SaleItem.product_id,
+        SaleItem.product_name,
+        func.sum(SaleItem.quantity).label('qty'),
+        func.sum(SaleItem.subtotal).label('revenue')
+    ).join(Sale).filter(Sale.created_at >= month_ago)
+    
+    if store_id:
+        top_products_query = top_products_query.filter(Sale.store_id == store_id)
+    
+    top_results = top_products_query.group_by(
+        SaleItem.product_id, SaleItem.product_name
+    ).order_by(func.sum(SaleItem.quantity).desc()).limit(10).all()
+    
+    top_products = [TopProduct(
+        product_id=r.product_id or 0,
+        product_name=r.product_name,
+        quantity_sold=int(r.qty or 0),
+        total_revenue=float(r.revenue or 0)
+    ) for r in top_results]
+    
+    least_results = top_products_query.group_by(
+        SaleItem.product_id, SaleItem.product_name
+    ).order_by(func.sum(SaleItem.quantity).asc()).limit(10).all()
+    
+    least_sold = [TopProduct(
+        product_id=r.product_id or 0,
+        product_name=r.product_name,
+        quantity_sold=int(r.qty or 0),
+        total_revenue=float(r.revenue or 0)
+    ) for r in least_results]
+    
+    return AdvancedStats(
+        payment_methods=payment_stats,
+        stores=store_stats,
+        top_products=top_products,
+        least_sold_products=least_sold
     )
 
 @router.get("/reports/sales/export")

@@ -355,12 +355,51 @@ class StockMovementResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class PaymentMethodStats(BaseModel):
+    payment_method: str
+    total_amount: float
+    transaction_count: int
+    percentage: float
+
+class StoreStats(BaseModel):
+    store_id: int
+    store_name: str
+    total_sales: float
+    total_expenses: float
+    profit: float
+    sales_count: int
+
+class TopProduct(BaseModel):
+    product_id: int
+    product_name: str
+    quantity_sold: int
+    total_revenue: float
+
+class AdvancedStats(BaseModel):
+    payment_methods: List[PaymentMethodStats]
+    stores: List[StoreStats]
+    top_products: List[TopProduct]
+    least_sold_products: List[TopProduct]
+
 class DashboardStats(BaseModel):
     total_sales_today: float
     total_sales_week: float
     total_sales_month: float
     total_expenses_today: float
+    total_expenses_week: float = 0
+    total_expenses_month: float = 0
     products_low_stock: int
     products_out_of_stock: int
     products_expiring_soon: int
     unread_alerts: int
+    profit_today: float = 0
+    profit_week: float = 0
+    profit_month: float = 0
+    cost_today: float = 0
+    cost_week: float = 0
+    cost_month: float = 0
+    sales_count_today: int = 0
+    sales_count_week: int = 0
+    sales_count_month: int = 0
+    average_ticket: float = 0
+    inventory_value: float = 0

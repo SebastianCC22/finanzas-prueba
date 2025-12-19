@@ -49,6 +49,7 @@ export default function Ventas() {
   const [salesHistory, setSalesHistory] = useState<Sale[]>([]);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [showSaleDetails, setShowSaleDetails] = useState(false);
+  const [cashReceived, setCashReceived] = useState("");
 
   useEffect(() => {
     if (currentStore) {
@@ -232,6 +233,11 @@ export default function Ventas() {
     return Math.max(0, total - totalPaid);
   }, [total, totalPaid]);
 
+  const change = useMemo(() => {
+    const received = parseFloat(cashReceived) || 0;
+    return Math.max(0, received - total);
+  }, [cashReceived, total]);
+
   const getRegisterForMethod = (method: string) => {
     return cashRegisters.find(
       (r) => r.payment_method === method && r.register_type === "menor"
@@ -323,6 +329,7 @@ export default function Ventas() {
       setCart([]);
       setPayments([]);
       setGlobalDiscount(0);
+      setCashReceived("");
       setGlobalDiscountReason("");
       setNotes("");
       setShowPaymentDialog(false);
@@ -712,7 +719,7 @@ export default function Ventas() {
             <DialogTitle>Procesar Pago</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-4 bg-muted rounded-lg">
+            <div className="p-4 bg-muted rounded-lg space-y-2">
               <div className="flex justify-between text-lg font-bold">
                 <span>Total a pagar:</span>
                 <span>${total.toLocaleString()}</span>
@@ -728,6 +735,31 @@ export default function Ventas() {
                     <span>${remaining.toLocaleString()}</span>
                   </div>
                 </>
+              )}
+            </div>
+
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="cashReceived" className="text-emerald-700 dark:text-emerald-300">
+                  Dinero Recibido (Efectivo)
+                </Label>
+                <Input
+                  id="cashReceived"
+                  type="number"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value)}
+                  placeholder="0"
+                  className="text-lg font-mono"
+                  data-testid="input-cash-received"
+                />
+              </div>
+              {parseFloat(cashReceived) > 0 && (
+                <div className="flex justify-between items-center p-3 bg-white dark:bg-emerald-900 rounded-lg">
+                  <span className="font-medium text-emerald-700 dark:text-emerald-300">Cambio:</span>
+                  <span className="text-2xl font-bold font-mono text-emerald-600" data-testid="text-change">
+                    ${change.toLocaleString()}
+                  </span>
+                </div>
               )}
             </div>
 

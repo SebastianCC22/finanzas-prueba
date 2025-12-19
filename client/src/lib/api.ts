@@ -287,6 +287,12 @@ class ApiClient {
     return this.request<DashboardStats>(`/dashboard/stats?${params}`);
   }
 
+  async getAdvancedStats(storeId?: number) {
+    const params = new URLSearchParams();
+    if (storeId) params.append('store_id', storeId.toString());
+    return this.request<AdvancedStats>(`/dashboard/advanced-stats?${params}`);
+  }
+
   getExportUrl(type: 'sales' | 'inventory' | 'expenses', format: 'excel' | 'pdf', filters: Record<string, string> = {}) {
     const params = new URLSearchParams({ format, ...filters });
     return `${API_BASE}/reports/${type}/export?${params}`;
@@ -661,8 +667,51 @@ export interface DashboardStats {
   total_sales_week: number;
   total_sales_month: number;
   total_expenses_today: number;
+  total_expenses_week: number;
+  total_expenses_month: number;
   products_low_stock: number;
   products_out_of_stock: number;
   products_expiring_soon: number;
   unread_alerts: number;
+  profit_today: number;
+  profit_week: number;
+  profit_month: number;
+  cost_today: number;
+  cost_week: number;
+  cost_month: number;
+  sales_count_today: number;
+  sales_count_week: number;
+  sales_count_month: number;
+  average_ticket: number;
+  inventory_value: number;
+}
+
+export interface PaymentMethodStats {
+  payment_method: string;
+  total_amount: number;
+  transaction_count: number;
+  percentage: number;
+}
+
+export interface StoreStats {
+  store_id: number;
+  store_name: string;
+  total_sales: number;
+  total_expenses: number;
+  profit: number;
+  sales_count: number;
+}
+
+export interface TopProduct {
+  product_id: number;
+  product_name: string;
+  quantity_sold: number;
+  total_revenue: number;
+}
+
+export interface AdvancedStats {
+  payment_methods: PaymentMethodStats[];
+  stores: StoreStats[];
+  top_products: TopProduct[];
+  least_sold_products: TopProduct[];
 }

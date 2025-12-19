@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import {
-  ShoppingCart, ArrowDownCircle, Wallet, TrendingUp,
+  ShoppingCart, ArrowDownCircle, Wallet, TrendingUp, TrendingDown,
   Package, AlertTriangle, Clock, Bell, Store,
-  DollarSign, BarChart3, FileText
+  DollarSign, BarChart3, FileText, Target, Receipt
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -18,6 +18,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     if (currentStore) {
@@ -70,45 +72,221 @@ export default function Dashboard() {
             <span className="text-sm font-semibold uppercase tracking-wider">
               {currentStore?.name}
             </span>
+            {isAdmin && (
+              <Badge variant="secondary" className="ml-2">Administrador</Badge>
+            )}
           </div>
           <h1 className="text-3xl font-bold tracking-tight" data-testid="text-welcome">
             Bienvenido, {user?.full_name || user?.username}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Resumen general de tu actividad
+            {isAdmin ? "Panel de control administrativo" : "Resumen del día"}
           </p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-none shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-100">
-              Ventas Hoy
-            </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-emerald-100" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono" data-testid="text-sales-today">
-              {formatCurrency(stats?.total_sales_today || 0)}
-            </div>
-          </CardContent>
-        </Card>
+      {isAdmin ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-none shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-emerald-100">
+                  Ventas Hoy
+                </CardTitle>
+                <ShoppingCart className="h-4 w-4 text-emerald-100" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold font-mono" data-testid="text-sales-today">
+                  {formatCurrency(stats?.total_sales_today || 0)}
+                </div>
+                <p className="text-xs text-emerald-200 mt-1">
+                  {stats?.sales_count_today || 0} ventas
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-rose-500 to-rose-600 text-white border-none shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-rose-100">
-              Egresos Hoy
-            </CardTitle>
-            <ArrowDownCircle className="h-4 w-4 text-rose-100" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono" data-testid="text-expenses-today">
-              {formatCurrency(stats?.total_expenses_today || 0)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-blue-100">
+                  Ventas Semana
+                </CardTitle>
+                <BarChart3 className="h-4 w-4 text-blue-100" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold font-mono" data-testid="text-sales-week">
+                  {formatCurrency(stats?.total_sales_week || 0)}
+                </div>
+                <p className="text-xs text-blue-200 mt-1">
+                  {stats?.sales_count_week || 0} ventas
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-violet-500 to-violet-600 text-white border-none shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-violet-100">
+                  Ventas Mes
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-violet-100" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold font-mono" data-testid="text-sales-month">
+                  {formatCurrency(stats?.total_sales_month || 0)}
+                </div>
+                <p className="text-xs text-violet-200 mt-1">
+                  {stats?.sales_count_month || 0} ventas
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white border-none shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-amber-100">
+                  Ticket Promedio
+                </CardTitle>
+                <Receipt className="h-4 w-4 text-amber-100" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold font-mono" data-testid="text-average-ticket">
+                  {formatCurrency(stats?.average_ticket || 0)}
+                </div>
+                <p className="text-xs text-amber-200 mt-1">Últimos 30 días</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className={`border-2 ${(stats?.profit_today || 0) >= 0 ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  {(stats?.profit_today || 0) >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-rose-500" />
+                  )}
+                  Ganancia Hoy
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold font-mono ${(stats?.profit_today || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} data-testid="text-profit-today">
+                  {formatCurrency(stats?.profit_today || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Ventas - Costos - Egresos
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className={`border-2 ${(stats?.profit_week || 0) >= 0 ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  {(stats?.profit_week || 0) >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-rose-500" />
+                  )}
+                  Ganancia Semana
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold font-mono ${(stats?.profit_week || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} data-testid="text-profit-week">
+                  {formatCurrency(stats?.profit_week || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Últimos 7 días
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className={`border-2 ${(stats?.profit_month || 0) >= 0 ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  {(stats?.profit_month || 0) >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-rose-500" />
+                  )}
+                  Ganancia Mes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold font-mono ${(stats?.profit_month || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} data-testid="text-profit-month">
+                  {formatCurrency(stats?.profit_month || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Últimos 30 días
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Valor del Inventario
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold font-mono" data-testid="text-inventory-value">
+                  {formatCurrency(stats?.inventory_value || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Costo total de productos en stock
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-rose-500 to-rose-600 text-white border-none shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-rose-100">
+                  Egresos Hoy
+                </CardTitle>
+                <ArrowDownCircle className="h-4 w-4 text-rose-100" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold font-mono" data-testid="text-expenses-today">
+                  {formatCurrency(stats?.total_expenses_today || 0)}
+                </div>
+                <p className="text-xs text-rose-200 mt-1">
+                  Semana: {formatCurrency(stats?.total_expenses_week || 0)}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-none shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-emerald-100">
+                Ventas Hoy
+              </CardTitle>
+              <ShoppingCart className="h-4 w-4 text-emerald-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono" data-testid="text-sales-today">
+                {formatCurrency(stats?.total_sales_today || 0)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-rose-500 to-rose-600 text-white border-none shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-rose-100">
+                Egresos Hoy
+              </CardTitle>
+              <ArrowDownCircle className="h-4 w-4 text-rose-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono" data-testid="text-expenses-today">
+                {formatCurrency(stats?.total_expenses_today || 0)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
