@@ -50,6 +50,8 @@ export default function Ventas() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [showSaleDetails, setShowSaleDetails] = useState(false);
   const [cashReceived, setCashReceived] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
 
   useEffect(() => {
     if (currentStore) {
@@ -466,11 +468,6 @@ export default function Ventas() {
                         <p className="font-medium text-sm">{item.product_name}</p>
                         <p className="text-xs text-muted-foreground">
                           ${item.final_price.toLocaleString()} x {item.quantity}
-                          {(item.discount_percent ?? 0) > 0 && (
-                            <span className="text-green-500 ml-1">
-                              (-{item.discount_percent}%)
-                            </span>
-                          )}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
@@ -496,15 +493,6 @@ export default function Ventas() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => openDiscountDialog(item.id)}
-                          data-testid={`button-discount-${item.id}`}
-                        >
-                          <Percent className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
                           className="h-7 w-7 text-destructive"
                           onClick={() => removeFromCart(item.id)}
                           data-testid={`button-remove-${item.id}`}
@@ -526,12 +514,6 @@ export default function Ventas() {
                   <span>IVA (informativo):</span>
                   <span>${taxTotal.toLocaleString()}</span>
                 </div>
-                {globalDiscount > 0 && (
-                  <div className="flex justify-between text-sm text-green-500">
-                    <span>Descuento global:</span>
-                    <span>-${globalDiscount.toLocaleString()}</span>
-                  </div>
-                )}
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total:</span>
                   <span data-testid="text-total">${total.toLocaleString()}</span>
@@ -752,6 +734,21 @@ export default function Ventas() {
                   className="text-lg font-mono"
                   data-testid="input-cash-received"
                 />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {[1000, 2000, 5000, 10000, 20000, 50000, 100000].map((amount) => (
+                    <Button
+                      key={amount}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-mono"
+                      onClick={() => setCashReceived(amount.toString())}
+                      data-testid={`button-preset-${amount}`}
+                    >
+                      ${amount.toLocaleString()}
+                    </Button>
+                  ))}
+                </div>
               </div>
               {parseFloat(cashReceived) > 0 && (
                 <div className="flex justify-between items-center p-3 bg-white dark:bg-emerald-900 rounded-lg">
@@ -763,23 +760,55 @@ export default function Ventas() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Métodos de Pago</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {PAYMENT_METHODS.map((method) => (
+            <div className="space-y-3">
+              <Label>Agregar Pago</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  placeholder="Monto"
+                  className="flex-1 font-mono"
+                  data-testid="input-payment-amount"
+                />
+                <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
+                  <SelectTrigger className="w-32" data-testid="select-payment-method">
+                    <SelectValue placeholder="Método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((method) => (
+                      <SelectItem key={method.id} value={method.id}>
+                        {method.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const amount = parseFloat(paymentAmount) || 0;
+                    if (amount > 0 && selectedPaymentMethod) {
+                      addPayment(selectedPaymentMethod, amount);
+                      setPaymentAmount("");
+                    }
+                  }}
+                  disabled={!selectedPaymentMethod || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                  data-testid="button-add-payment"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {[remaining, 5000, 10000, 20000, 50000].filter(v => v > 0).map((preset, idx) => (
                   <Button
-                    key={method.id}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                    onClick={() => {
-                      const amount = remaining || total;
-                      addPayment(method.id, amount);
-                    }}
-                    disabled={remaining === 0}
-                    data-testid={`button-payment-${method.id}`}
+                    key={idx}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs font-mono h-7"
+                    onClick={() => setPaymentAmount(preset.toString())}
                   >
-                    <method.icon className="h-4 w-4" />
-                    {method.label}
+                    {idx === 0 && remaining > 0 ? `Todo (${remaining.toLocaleString()})` : `$${preset.toLocaleString()}`}
                   </Button>
                 ))}
               </div>
@@ -811,25 +840,6 @@ export default function Ventas() {
                 ))}
               </div>
             )}
-
-            <div className="space-y-2">
-              <Label>Descuento Global (opcional)</Label>
-              <Input
-                type="number"
-                value={globalDiscount}
-                onChange={(e) => setGlobalDiscount(Number(e.target.value))}
-                placeholder="0"
-                data-testid="input-global-discount"
-              />
-              {globalDiscount > 0 && (
-                <Input
-                  value={globalDiscountReason}
-                  onChange={(e) => setGlobalDiscountReason(e.target.value)}
-                  placeholder="Motivo del descuento"
-                  data-testid="input-discount-reason"
-                />
-              )}
-            </div>
 
             <div className="space-y-2">
               <Label>Notas (opcional)</Label>

@@ -757,10 +757,12 @@ def create_cash_opening(
     existing = db.query(CashOpening).filter(
         CashOpening.store_id == opening_data.store_id,
         func.date(CashOpening.opening_date) == today
-    ).first()
+    ).all()
     
-    if existing:
-        raise HTTPException(status_code=400, detail="Ya existe una apertura de caja para hoy")
+    for opening in existing:
+        has_closing = db.query(CashClosing).filter(CashClosing.opening_id == opening.id).first()
+        if not has_closing:
+            raise HTTPException(status_code=400, detail="Ya existe una apertura de caja abierta hoy. Debe cerrarla primero.")
     
     opening = CashOpening(
         store_id=opening_data.store_id,
@@ -805,11 +807,17 @@ def get_cash_openings(
 @router.get("/cash-openings/today/{store_id}", response_model=Optional[CashOpeningResponse])
 def get_today_opening(store_id: int, db: Session = Depends(get_db)):
     today = datetime.now().date()
-    opening = db.query(CashOpening).filter(
+    openings = db.query(CashOpening).filter(
         CashOpening.store_id == store_id,
         func.date(CashOpening.opening_date) == today
-    ).first()
-    return opening
+    ).order_by(CashOpening.opening_date.desc()).all()
+    
+    for opening in openings:
+        has_closing = db.query(CashClosing).filter(CashClosing.opening_id == opening.id).first()
+        if not has_closing:
+            return opening
+    
+    return None
 
 @router.put("/cash-openings/{opening_id}", response_model=CashOpeningResponse)
 def update_cash_opening(

@@ -209,46 +209,68 @@ export default function Cierre() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Saldo de Cajas</CardTitle>
-          <CardDescription>Estado actual de cada caja</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {cashRegisters
-              .filter((r) => r.store_id === currentStore?.id || r.is_global)
-              .map((register) => (
-                <div
-                  key={register.id}
-                  className="p-4 border rounded-lg bg-muted/20"
-                  data-testid={`register-${register.id}`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                    {register.is_global && (
-                      <Badge variant="outline" className="text-xs">
-                        Global
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="font-medium text-sm">{register.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize mb-2">
-                    {register.payment_method} - {register.register_type}
-                  </p>
-                  <p
-                    className={cn(
-                      "font-mono font-bold text-lg",
-                      register.current_balance < 0 && "text-destructive"
-                    )}
-                  >
-                    {formatCurrency(register.current_balance)}
-                  </p>
+      <div className="grid gap-6 md:grid-cols-2">
+        {["menor", "mayor"].map((type) => {
+          const typeRegisters = cashRegisters.filter(
+            (r) => (r.store_id === currentStore?.id || r.is_global) && r.register_type === type
+          );
+          const typeTotal = typeRegisters.reduce((sum, r) => sum + r.current_balance, 0);
+          
+          return (
+            <Card key={type}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Wallet className="h-4 w-4" />
+                    Cajas {type === "menor" ? "Menor" : "Mayor"}
+                  </CardTitle>
+                  <Badge variant={type === "menor" ? "secondary" : "default"} className="font-mono">
+                    {formatCurrency(typeTotal)}
+                  </Badge>
                 </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
+                <CardDescription>
+                  {type === "menor" ? "Cajas para operaciones diarias" : "Cajas principales"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {typeRegisters.map((register) => (
+                    <div
+                      key={register.id}
+                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border"
+                      data-testid={`register-${register.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          register.current_balance >= 0 ? "bg-emerald-500" : "bg-red-500"
+                        )} />
+                        <div>
+                          <p className="font-medium text-sm">{register.name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">
+                            {register.payment_method}
+                          </p>
+                        </div>
+                      </div>
+                      <p className={cn(
+                        "font-mono font-bold",
+                        register.current_balance < 0 && "text-destructive"
+                      )}>
+                        {formatCurrency(register.current_balance)}
+                      </p>
+                    </div>
+                  ))}
+                  {typeRegisters.length === 0 && (
+                    <p className="text-center text-muted-foreground text-sm py-4">
+                      No hay cajas de este tipo
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
       <Card>
         <CardHeader>
