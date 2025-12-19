@@ -277,8 +277,8 @@ export default function Ventas() {
 
     if (totalPaid < total) {
       toast({
-        title: "Error",
-        description: "El pago no cubre el total de la venta",
+        title: "Fondos insuficientes",
+        description: `Fondo insuficiente. Total: ${formatCurrency(total)} - Pagado: ${formatCurrency(totalPaid)} - Falta: ${formatCurrency(total - totalPaid)}`,
         variant: "destructive",
       });
       return;

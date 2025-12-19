@@ -21,6 +21,7 @@ export default function Apertura() {
   const [initialBalance, setInitialBalance] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (currentStore) {
@@ -53,16 +54,29 @@ export default function Apertura() {
 
     setIsSubmitting(true);
     try {
-      await api.createCashOpening({
-        store_id: currentStore.id,
-        initial_balance: parseFloat(initialBalance) || 0,
-        notes: notes || undefined,
-      });
+      if (isEditing && todayOpening) {
+        await api.updateCashOpening(todayOpening.id, {
+          initial_balance: parseFloat(initialBalance) || 0,
+          notes: notes || undefined,
+        });
 
-      toast({
-        title: "Apertura Registrada",
-        description: `Se ha registrado la apertura de caja para ${currentStore.name}`,
-      });
+        toast({
+          title: "Apertura Actualizada",
+          description: `Se ha actualizado la apertura de caja`,
+        });
+        setIsEditing(false);
+      } else {
+        await api.createCashOpening({
+          store_id: currentStore.id,
+          initial_balance: parseFloat(initialBalance) || 0,
+          notes: notes || undefined,
+        });
+
+        toast({
+          title: "Apertura Registrada",
+          description: `Se ha registrado la apertura de caja para ${currentStore.name}`,
+        });
+      }
 
       setInitialBalance("");
       setNotes("");
@@ -100,20 +114,33 @@ export default function Apertura() {
       {todayOpening && (
         <Card className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
-                <Check className="h-5 w-5 text-emerald-600" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
+                  <Check className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-emerald-700 dark:text-emerald-300">
+                    Apertura realizada hoy
+                  </p>
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                    {format(new Date(todayOpening.opening_date), "PPP 'a las' p", { locale: es })}
+                    {" - "}
+                    Base: {formatCurrency(todayOpening.initial_balance)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-emerald-700 dark:text-emerald-300">
-                  Apertura realizada hoy
-                </p>
-                <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                  {format(new Date(todayOpening.opening_date), "PPP 'a las' p", { locale: es })}
-                  {" - "}
-                  Base: {formatCurrency(todayOpening.initial_balance)}
-                </p>
-              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setInitialBalance(todayOpening.initial_balance.toString());
+                  setNotes(todayOpening.notes || "");
+                }}
+                data-testid="button-edit-opening"
+              >
+                Editar
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -124,16 +151,16 @@ export default function Apertura() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <LockOpen className="h-5 w-5 text-primary" />
-              Nueva Apertura
+              {isEditing ? "Editar Apertura" : "Nueva Apertura"}
             </CardTitle>
             <CardDescription>Ingresa los valores base de las cajas</CardDescription>
           </CardHeader>
           <CardContent>
-            {todayOpening ? (
+            {todayOpening && !isEditing ? (
               <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <AlertCircle className="h-5 w-5 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Ya se realizó la apertura de caja hoy. Solo se permite una apertura por día.
+                  Ya se realizó la apertura de caja hoy. Usa el botón Editar para hacer cambios.
                 </p>
               </div>
             ) : (
@@ -162,14 +189,32 @@ export default function Apertura() {
                   />
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full h-11 text-base"
-                  disabled={isSubmitting}
-                  data-testid="button-submit"
-                >
-                  {isSubmitting ? "Registrando..." : "Registrar Apertura"}
-                </Button>
+                <div className="flex gap-2">
+                  {isEditing && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-11 text-base"
+                      onClick={() => {
+                        setIsEditing(false);
+                        setInitialBalance("");
+                        setNotes("");
+                      }}
+                      disabled={isSubmitting}
+                      data-testid="button-cancel-edit"
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                  <Button
+                    type="submit"
+                    className="w-full h-11 text-base"
+                    disabled={isSubmitting}
+                    data-testid="button-submit"
+                  >
+                    {isSubmitting ? (isEditing ? "Actualizando..." : "Registrando...") : (isEditing ? "Actualizar Apertura" : "Registrar Apertura")}
+                  </Button>
+                </div>
               </form>
             )}
           </CardContent>

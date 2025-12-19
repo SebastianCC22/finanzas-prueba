@@ -28,6 +28,7 @@ export default function Cierre() {
   const [actualBalance, setActualBalance] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingClosingId, setEditingClosingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (currentStore) {
@@ -60,17 +61,30 @@ export default function Cierre() {
 
     setIsSubmitting(true);
     try {
-      await api.createCashClosing({
-        opening_id: todayOpening.id,
-        store_id: currentStore.id,
-        actual_balance: parseFloat(actualBalance) || 0,
-        notes: notes || undefined,
-      });
+      if (editingClosingId) {
+        await api.updateCashClosing(editingClosingId, {
+          actual_balance: parseFloat(actualBalance) || 0,
+          notes: notes || undefined,
+        });
 
-      toast({
-        title: "Cierre registrado",
-        description: "El cierre de caja se ha registrado correctamente",
-      });
+        toast({
+          title: "Cierre actualizado",
+          description: "El cierre de caja se ha actualizado correctamente",
+        });
+        setEditingClosingId(null);
+      } else {
+        await api.createCashClosing({
+          opening_id: todayOpening.id,
+          store_id: currentStore.id,
+          actual_balance: parseFloat(actualBalance) || 0,
+          notes: notes || undefined,
+        });
+
+        toast({
+          title: "Cierre registrado",
+          description: "El cierre de caja se ha registrado correctamente",
+        });
+      }
 
       setShowClosingDialog(false);
       setActualBalance("");
@@ -260,15 +274,30 @@ export default function Cierre() {
                     <Badge variant="outline">
                       {format(new Date(closing.closing_date), "PPP", { locale: es })}
                     </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => downloadReport(closing.id)}
-                      data-testid={`button-download-${closing.id}`}
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      PDF
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingClosingId(closing.id);
+                          setActualBalance(closing.actual_balance.toString());
+                          setNotes(closing.notes || "");
+                          setShowClosingDialog(true);
+                        }}
+                        data-testid={`button-edit-${closing.id}`}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => downloadReport(closing.id)}
+                        data-testid={`button-download-${closing.id}`}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        PDF
+                      </Button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
@@ -315,10 +344,17 @@ export default function Cierre() {
         </CardContent>
       </Card>
 
-      <Dialog open={showClosingDialog} onOpenChange={setShowClosingDialog}>
+      <Dialog open={showClosingDialog} onOpenChange={(open) => {
+        setShowClosingDialog(open);
+        if (!open) {
+          setEditingClosingId(null);
+          setActualBalance("");
+          setNotes("");
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cierre de Caja</DialogTitle>
+            <DialogTitle>{editingClosingId ? "Editar Cierre de Caja" : "Cierre de Caja"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="p-4 bg-muted rounded-lg">
@@ -353,7 +389,12 @@ export default function Cierre() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowClosingDialog(false)}>
+            <Button variant="outline" onClick={() => {
+              setShowClosingDialog(false);
+              setEditingClosingId(null);
+              setActualBalance("");
+              setNotes("");
+            }}>
               Cancelar
             </Button>
             <Button
@@ -361,7 +402,7 @@ export default function Cierre() {
               disabled={isSubmitting || !actualBalance}
               data-testid="button-confirm-closing"
             >
-              {isSubmitting ? "Procesando..." : "Confirmar Cierre"}
+              {isSubmitting ? "Procesando..." : (editingClosingId ? "Actualizar Cierre" : "Confirmar Cierre")}
             </Button>
           </DialogFooter>
         </DialogContent>
