@@ -306,6 +306,10 @@ class CashClosingCreate(BaseModel):
     actual_balance: float
     notes: Optional[str] = None
 
+class CashClosingUpdate(BaseModel):
+    actual_balance: Optional[float] = None
+    notes: Optional[str] = None
+
 class CashClosingResponse(BaseModel):
     id: int
     opening_id: int

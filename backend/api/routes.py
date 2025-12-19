@@ -23,7 +23,7 @@ from backend.api.schemas import (
     ExpenseCreate, ExpenseResponse,
     CashTransferCreate, CashTransferResponse,
     CashOpeningCreate, CashOpeningResponse, CashOpeningUpdate,
-    CashClosingCreate, CashClosingResponse,
+    CashClosingCreate, CashClosingResponse, CashClosingUpdate,
     AlertResponse, StockMovementResponse, DashboardStats
 )
 from backend.services.auth import (
@@ -941,6 +941,40 @@ def get_cash_closings(
         query = query.filter(CashClosing.closing_date <= end_date)
     
     return query.order_by(CashClosing.closing_date.desc()).all()
+
+@router.put("/cash-closings/{closing_id}", response_model=CashClosingResponse)
+def update_cash_closing(
+    closing_id: int,
+    update_data: CashClosingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    closing = db.query(CashClosing).filter(CashClosing.id == closing_id).first()
+    if not closing:
+        raise HTTPException(status_code=404, detail="Cierre no encontrado")
+    
+    opening = db.query(CashOpening).filter(CashOpening.id == closing.opening_id).first()
+    
+    if update_data.actual_balance is not None:
+        new_actual = Decimal(str(update_data.actual_balance))
+        closing.actual_balance = new_actual
+        closing.difference = new_actual - closing.expected_balance
+    
+    if update_data.notes is not None:
+        closing.notes = update_data.notes
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="update_cash_closing",
+        entity_type="cash_closing",
+        entity_id=closing.id,
+        new_values=f"Updated: balance={update_data.actual_balance}, notes={update_data.notes}"
+    )
+    db.add(audit)
+    
+    db.commit()
+    db.refresh(closing)
+    return closing
 
 @router.get("/alerts", response_model=List[AlertResponse])
 def get_alerts(

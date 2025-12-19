@@ -255,6 +255,13 @@ class ApiClient {
     return this.request<CashClosing[]>(`/cash-closings?${params}`);
   }
 
+  async updateCashClosing(closingId: number, data: { actual_balance?: number; notes?: string }) {
+    return this.request<CashClosing>(`/cash-closings/${closingId}`, {
+      method: 'PUT',
+      body: data,
+    });
+  }
+
   async getAlerts(storeId?: number, unreadOnly: boolean = false) {
     const params = new URLSearchParams();
     if (storeId) params.append('store_id', storeId.toString());

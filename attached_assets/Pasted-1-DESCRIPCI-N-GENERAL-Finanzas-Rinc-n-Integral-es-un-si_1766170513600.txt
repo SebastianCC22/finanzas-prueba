@@ -1,0 +1,408 @@
+1. DESCRIPCIÓN GENERAL
+
+Finanzas Rincón Integral es un sistema POS web diseñado para la gestión integral de tiendas físicas, enfocado en control de ventas, inventario, caja, egresos y análisis financiero real.
+
+El sistema está pensado para:
+
+Cajeros (operación diaria)
+
+Administradores (control, análisis y toma de decisiones)
+
+Actualmente gestiona dos tiendas:
+
+20 de Julio
+
+Tunal
+
+2. OBJETIVO DEL SISTEMA
+
+El objetivo del sistema no es solo vender, sino:
+
+Medir ganancias reales
+
+Analizar rendimiento del negocio
+
+Detectar pérdidas, errores y oportunidades
+
+Facilitar decisiones del administrador
+
+Mantener una experiencia simple para el cajero
+
+3. TECNOLOGÍAS (ESTADO ACTUAL)
+Frontend
+
+React 18 + TypeScript
+
+Vite
+
+Zustand (estado global con persistencia)
+
+Tailwind CSS + Shadcn UI
+
+Recharts (gráficas)
+
+React Hook Form + Zod
+
+Backend
+
+Node.js + Express + TypeScript
+
+Arquitectura basada en interfaces (IStorage)
+
+MemStorage (temporal)
+
+Backend preparado para migración futura a DB
+
+⚠️ Nota importante
+Actualmente los datos se manejan en cliente, pero el sistema está diseñado para migrar a persistencia real (SQLite / PostgreSQL) sin rehacer la app.
+
+4. ROLES DEL SISTEMA
+👑 Administrador
+
+Puede:
+
+Ver estadísticas completas
+
+Ver ganancias reales
+
+Ver reportes
+
+Crear y gestionar usuarios
+
+Editar inventario, precios y costos
+
+Ver todas las tiendas
+
+🧾 Cajero
+
+Puede:
+
+Realizar ventas
+
+Registrar egresos básicos
+
+Abrir y cerrar caja
+
+NO puede ver ganancias ni estadísticas sensibles
+
+5. MÓDULOS Y FUNCIONALIDADES
+🏠 5.1 INICIO (DASHBOARD)
+Cajero
+
+Ventas del día
+
+Egresos del día
+
+Estado del inventario:
+
+Agotados (clic redirige a inventario filtrado)
+
+Stock bajo (clic redirige a inventario filtrado)
+
+❌ Eliminado:
+
+Ventas semanales
+
+Ventas mensuales
+
+Acciones rápidas
+
+Administrador – Dashboard avanzado
+Métricas principales
+
+Ventas del día / semana / mes
+
+Ganancia del día / semana / mes
+
+Ganancia total histórica
+
+Número de ventas
+
+Ticket promedio
+
+💰 5.2 GANANCIAS REALES (CLAVE)
+Cálculo
+Ganancia real = Ventas – Costos – Egresos
+
+
+Se muestran:
+
+Ganancia diaria
+
+Ganancia semanal
+
+Ganancia mensual
+
+Comparación mes vs mes
+
+Tendencia (sube / baja)
+
+🛒 5.3 VENTAS (BIEN MOSTRADAS)
+
+Total vendido
+
+Cantidad de ventas
+
+Ticket promedio
+
+Comparación por períodos
+
+Gráficas claras (líneas / barras)
+
+📦 5.4 INVENTARIO
+Funciones
+
+CRUD completo de productos
+
+Precio de venta
+
+Precio costo
+
+IVA informativo:
+
+19% o 5%
+
+Peso / volumen
+
+Proveedor, marca, presentación
+
+Mejoras clave
+
+Confirmación al salir sin guardar
+
+Inputs sin “0” fijo
+
+Edición correcta de costo y peso
+
+Exportación a Excel funcional
+
+📊 ESTADÍSTICAS DE INVENTARIO
+
+Valor total del inventario (costo × cantidad)
+
+Productos agotados
+
+Stock bajo
+
+Productos más vendidos
+
+Productos menos vendidos
+
+Productos sin movimiento
+
+Rotación de inventario
+
+🔥 5.5 PRODUCTOS MÁS Y MENOS VENDIDOS
+Más vendidos
+
+Top por cantidad
+
+Top por dinero generado
+
+Menos vendidos
+
+Productos con baja rotación
+
+Productos sin ventas en X días
+
+Valor inmovilizado
+
+🏪 5.6 RENDIMIENTO POR TIENDA
+
+Ventas por tienda
+
+Ganancias por tienda
+
+Egresos por tienda
+
+Comparativas visuales
+
+Ranking de tiendas
+
+💳 5.7 RENDIMIENTO POR MÉTODO DE PAGO
+
+Total por método:
+
+Efectivo
+
+Nequi
+
+Daviplata
+
+Bold
+
+Porcentaje de uso
+
+Apoyo al cuadre de cajas
+
+🔁 5.8 FLUJO DE DINERO (CASH FLOW)
+
+Dinero que entra
+
+Dinero que sale
+
+Balance final
+
+Gráfica de flujo
+
+Comparación entre períodos
+
+🧾 5.9 EGRESOS INTELIGENTES
+
+Registro con fecha/hora Bogotá
+
+Clasificación por categoría
+
+Comparativa:
+
+Ventas vs egresos
+
+Alertas cuando:
+
+Egresos superan cierto porcentaje
+
+Exportación: solo PDF
+
+🚨 5.10 ALERTAS INTELIGENTES
+
+Ejemplos:
+
+“Egresos altos hoy”
+
+“Producto sin ventas hace 30 días”
+
+“Stock crítico”
+
+“Ganancia negativa en el día”
+
+👥 5.11 ESTADÍSTICAS DE USUARIOS (CAJEROS)
+
+Ventas por cajero
+
+Total vendido
+
+Número de transacciones
+
+Historial
+
+Detección de anomalías
+
+🧾 5.12 VENTAS POS
+
+IVA solo informativo (NO modifica precio)
+
+Selección de producto con clic completo
+
+Pago mixto
+
+Recibido / Cambio
+
+Eliminación de descuentos automáticos
+
+Confirmación correcta de venta
+
+Opción de imprimir factura
+
+📄 5.13 REPORTES PROFESIONALES (PDF)
+
+Reportes descargables:
+
+Diario
+
+Semanal
+
+Mensual
+
+Por tienda
+
+Por método de pago
+
+Ganancias
+
+Inventario
+
+Usuarios
+
+❌ Excel eliminado excepto inventario
+
+🔐 5.14 USUARIOS Y SEGURIDAD
+
+Administradores
+
+Cajeros
+
+Estructura preparada para autenticación real
+
+Roles bien definidos
+
+🧠 5.15 APERTURA Y CIERRE DE CAJA
+Apertura
+
+Editable
+
+Resta de caja mayor
+
+Suma a caja menor
+
+Cierre
+
+Editable
+
+Consolidación automática:
+
+Ventas
+
+Egresos
+
+Transferencias
+
+Transferencia automática de fondos:
+
+Digital → caja mayor
+
+Efectivo → caja mayor
+
+UI
+
+Visual clara
+
+Cajas desplegables
+
+Totales visibles
+
+🎨 6. UX RECOMENDADO (CÓMO MOSTRAR TODO)
+
+Dashboard limpio
+
+Métricas grandes
+
+Gráficas simples
+
+Detalles desplegables
+
+Alertas visibles pero no invasivas
+
+Diseño entendible para personas no técnicas
+
+📈 7. COMPARACIÓN MES VS MES
+
+Ventas
+
+Ganancias
+
+Egresos
+
+Variación porcentual
+
+Indicadores visuales (↑ ↓)
+
+8. ESTADO FINAL ESPERADO
+
+Al finalizar estas mejoras, el sistema será:
+
+✅ POS profesional
+✅ Herramienta de gestión real
+✅ Preparado para crecer
+✅ Apto para múltiples tiendas
+✅ Claro para cajeros
+✅ Potente para administradores
