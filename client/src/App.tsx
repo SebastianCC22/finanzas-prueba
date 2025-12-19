@@ -24,19 +24,32 @@ function PrivateRoute({ component: Component, requireStore = true, ...rest }: an
   const { isAuthenticated, checkAuth, currentStore } = useAuthStore();
   const [, setLocation] = useLocation();
   const [isChecking, setIsChecking] = useState(true);
+  const [shouldRedirect, setShouldRedirect] = useState<string | null>(null);
 
   useEffect(() => {
     const verify = async () => {
       const valid = await checkAuth();
       if (!valid) {
-        setLocation("/login");
-        setIsChecking(false);
-        return;
+        setShouldRedirect("/login");
       }
       setIsChecking(false);
     };
     verify();
-  }, [setLocation]);
+  }, []);
+
+  useEffect(() => {
+    if (!isChecking && !isAuthenticated) {
+      setShouldRedirect("/login");
+    } else if (!isChecking && requireStore && !currentStore) {
+      setShouldRedirect("/select-store");
+    }
+  }, [isChecking, isAuthenticated, currentStore, requireStore]);
+
+  useEffect(() => {
+    if (shouldRedirect) {
+      setLocation(shouldRedirect);
+    }
+  }, [shouldRedirect, setLocation]);
 
   if (isChecking) {
     return (
@@ -46,13 +59,7 @@ function PrivateRoute({ component: Component, requireStore = true, ...rest }: an
     );
   }
 
-  if (!isAuthenticated) {
-    setLocation("/login");
-    return null;
-  }
-
-  if (requireStore && !currentStore) {
-    setLocation("/select-store");
+  if (!isAuthenticated || (requireStore && !currentStore)) {
     return null;
   }
 

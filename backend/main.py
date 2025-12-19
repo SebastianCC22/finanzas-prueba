@@ -117,35 +117,39 @@ def health_check():
 @app.get("/api/download-source")
 def download_source():
     """Download the entire source code as a ZIP file"""
-    buffer = io.BytesIO()
+    import tempfile
+    import shutil
     
-    exclude_dirs = {'.git', 'node_modules', '__pycache__', 'dist', '.cache', '.upm', '.pythonlibs', 'venv', '.venv', '.config', '.local'}
-    exclude_extensions = {'.pyc', '.pyo', '.db', '.sqlite', '.log', '.lock'}
+    include_dirs = ['backend', 'client', 'server', 'shared']
+    include_files = ['package.json', 'tsconfig.json', 'vite.config.ts', 'drizzle.config.ts', 'tailwind.config.ts', 'postcss.config.js', 'requirements.txt']
     
-    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for root, dirs, files in os.walk('.'):
-            dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.startswith('.')]
-            
-            for file in files:
-                if any(file.endswith(ext) for ext in exclude_extensions):
-                    continue
-                if file.startswith('.'):
-                    continue
-                    
-                file_path = os.path.join(root, file)
-                arcname = file_path[2:] if file_path.startswith('./') else file_path
-                
+    temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+    temp_zip.close()
+    
+    with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for dir_name in include_dirs:
+            if os.path.exists(dir_name):
+                for root, dirs, files in os.walk(dir_name):
+                    dirs[:] = [d for d in dirs if d != '__pycache__' and not d.startswith('.')]
+                    for file in files:
+                        if not file.endswith(('.pyc', '.pyo')):
+                            file_path = os.path.join(root, file)
+                            try:
+                                zf.write(file_path, file_path)
+                            except:
+                                pass
+        
+        for file_name in include_files:
+            if os.path.exists(file_name):
                 try:
-                    with open(file_path, 'rb') as f:
-                        zf.writestr(arcname, f.read())
-                except Exception:
+                    zf.write(file_name, file_name)
+                except:
                     pass
     
-    zip_bytes = buffer.getvalue()
-    return Response(
-        content=zip_bytes,
+    return FileResponse(
+        temp_zip.name,
         media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=finanzas-rincon-integral.zip"}
+        filename="finanzas-rincon-integral.zip"
     )
 
 dist_path = "dist/public"
