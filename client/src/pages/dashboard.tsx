@@ -9,7 +9,7 @@ import { Link } from "wouter";
 import {
   ShoppingCart, ArrowDownCircle, Wallet, TrendingUp, TrendingDown,
   Package, AlertTriangle, Clock, Bell, Store,
-  DollarSign, BarChart3, FileText, Target, Receipt
+  DollarSign, BarChart3, FileText, Target, Receipt, Download
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -83,6 +83,17 @@ export default function Dashboard() {
             {isAdmin ? "Panel de control administrativo" : "Resumen del día"}
           </p>
         </div>
+        {isAdmin && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open("/api/download-source", "_blank")}
+            data-testid="button-download-source"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Descargar Código
+          </Button>
+        )}
       </div>
 
       {isAdmin ? (

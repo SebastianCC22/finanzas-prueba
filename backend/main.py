@@ -1,9 +1,11 @@
 import os
+import zipfile
+import io
 from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from contextlib import asynccontextmanager
 
 from backend.models.database import engine, Base, SessionLocal
@@ -98,6 +100,39 @@ app.include_router(router, prefix="/api")
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.get("/api/download-source")
+def download_source():
+    """Download the entire source code as a ZIP file"""
+    buffer = io.BytesIO()
+    
+    exclude_dirs = {'.git', 'node_modules', '__pycache__', 'dist', '.cache', '.upm', '.pythonlibs', 'venv', '.venv'}
+    exclude_extensions = {'.pyc', '.pyo', '.db', '.sqlite', '.log'}
+    
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk('.'):
+            dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.startswith('.')]
+            
+            for file in files:
+                if any(file.endswith(ext) for ext in exclude_extensions):
+                    continue
+                if file.startswith('.'):
+                    continue
+                    
+                file_path = os.path.join(root, file)
+                arcname = file_path[2:] if file_path.startswith('./') else file_path
+                
+                try:
+                    zf.write(file_path, arcname)
+                except Exception:
+                    pass
+    
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=finanzas-rincon-integral.zip"}
+    )
 
 dist_path = "dist/public"
 if os.path.exists(dist_path):
