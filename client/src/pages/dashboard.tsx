@@ -80,7 +80,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
         <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-none shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-emerald-100">
@@ -91,34 +91,6 @@ export default function Dashboard() {
           <CardContent>
             <div className="text-2xl font-bold font-mono" data-testid="text-sales-today">
               {formatCurrency(stats?.total_sales_today || 0)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-100">
-              Ventas Semana
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-100" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono" data-testid="text-sales-week">
-              {formatCurrency(stats?.total_sales_week || 0)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-none shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-purple-100">
-              Ventas Mes
-            </CardTitle>
-            <BarChart3 className="h-4 w-4 text-purple-100" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono" data-testid="text-sales-month">
-              {formatCurrency(stats?.total_sales_month || 0)}
             </div>
           </CardContent>
         </Card>
@@ -138,7 +110,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -206,41 +178,6 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Acciones Rápidas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Link href="/ventas">
-              <Button className="w-full justify-start" variant="default" data-testid="button-new-sale">
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Nueva Venta
-              </Button>
-            </Link>
-            <Link href="/apertura">
-              <Button className="w-full justify-start" variant="outline" data-testid="button-open-cash">
-                <Wallet className="h-4 w-4 mr-2" />
-                Apertura de Caja
-              </Button>
-            </Link>
-            <Link href="/cierre">
-              <Button className="w-full justify-start" variant="outline" data-testid="button-close-cash">
-                <FileText className="h-4 w-4 mr-2" />
-                Cierre de Caja
-              </Button>
-            </Link>
-            <Link href="/reportes">
-              <Button className="w-full justify-start" variant="outline" data-testid="button-reports">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Ver Reportes
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>
