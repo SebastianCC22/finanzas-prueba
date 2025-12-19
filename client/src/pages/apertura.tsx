@@ -136,6 +136,7 @@ export default function Apertura() {
                 onClick={() => {
                   setInitialBalance(todayOpening.initial_balance.toString());
                   setNotes(todayOpening.notes || "");
+                  setIsEditing(true);
                 }}
                 data-testid="button-edit-opening"
               >

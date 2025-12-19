@@ -459,7 +459,7 @@ export default function Ventas() {
                         <p className="font-medium text-sm">{item.product_name}</p>
                         <p className="text-xs text-muted-foreground">
                           ${item.final_price.toLocaleString()} x {item.quantity}
-                          {item.discount_percent > 0 && (
+                          {(item.discount_percent ?? 0) > 0 && (
                             <span className="text-green-500 ml-1">
                               (-{item.discount_percent}%)
                             </span>
