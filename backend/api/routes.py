@@ -10,7 +10,8 @@ from backend.models.models import (
     User, Store, CashRegister, Product, StockMovement,
     Sale, SaleItem, Payment, Return, ReturnItem,
     ProductTransfer, Expense, CashTransfer,
-    CashOpening, CashClosing, Alert, AuditLog
+    CashOpening, CashClosing, Alert, AuditLog,
+    Supplier, SupplierInvoice, InvoicePayment
 )
 from backend.api.schemas import (
     UserCreate, UserResponse, UserLogin, Token,
@@ -25,7 +26,10 @@ from backend.api.schemas import (
     CashOpeningCreate, CashOpeningResponse, CashOpeningUpdate,
     CashClosingCreate, CashClosingResponse, CashClosingUpdate,
     AlertResponse, StockMovementResponse, DashboardStats,
-    PaymentMethodStats, StoreStats, TopProduct, AdvancedStats
+    PaymentMethodStats, StoreStats, TopProduct, AdvancedStats,
+    SupplierCreate, SupplierUpdate, SupplierResponse,
+    SupplierInvoiceCreate, SupplierInvoiceUpdate, SupplierInvoiceResponse,
+    InvoicePaymentCreate, InvoicePaymentResponse, SupplierInvoiceSummary
 )
 from backend.services.auth import (
     get_password_hash, verify_password, create_access_token,
@@ -1354,3 +1358,396 @@ def export_closing_report(closing_id: int, db: Session = Depends(get_db)):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=cierre_{closing_id}.pdf"}
     )
+
+@router.get("/suppliers", response_model=List[SupplierResponse])
+def get_suppliers(
+    active_only: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    query = db.query(Supplier)
+    if active_only:
+        query = query.filter(Supplier.is_active == True)
+    suppliers = query.order_by(Supplier.name).all()
+    
+    result = []
+    for s in suppliers:
+        pending = db.query(func.sum(SupplierInvoice.total_amount - SupplierInvoice.paid_amount)).filter(
+            SupplierInvoice.supplier_id == s.id,
+            SupplierInvoice.status.in_(["pendiente", "parcial", "vencida"])
+        ).scalar() or 0
+        
+        invoices_count = db.query(SupplierInvoice).filter(SupplierInvoice.supplier_id == s.id).count()
+        
+        result.append(SupplierResponse(
+            id=s.id,
+            name=s.name,
+            contact_name=s.contact_name,
+            phone=s.phone,
+            email=s.email,
+            address=s.address,
+            notes=s.notes,
+            is_active=s.is_active,
+            created_at=s.created_at,
+            updated_at=s.updated_at,
+            invoices_count=invoices_count,
+            pending_amount=float(pending)
+        ))
+    return result
+
+@router.post("/suppliers", response_model=SupplierResponse)
+def create_supplier(
+    supplier: SupplierCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    db_supplier = Supplier(**supplier.model_dump())
+    db.add(db_supplier)
+    db.commit()
+    db.refresh(db_supplier)
+    return SupplierResponse(
+        id=db_supplier.id,
+        name=db_supplier.name,
+        contact_name=db_supplier.contact_name,
+        phone=db_supplier.phone,
+        email=db_supplier.email,
+        address=db_supplier.address,
+        notes=db_supplier.notes,
+        is_active=db_supplier.is_active,
+        created_at=db_supplier.created_at,
+        updated_at=db_supplier.updated_at,
+        invoices_count=0,
+        pending_amount=0
+    )
+
+@router.put("/suppliers/{supplier_id}", response_model=SupplierResponse)
+def update_supplier(
+    supplier_id: int,
+    supplier: SupplierUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    db_supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not db_supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
+    update_data = supplier.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_supplier, key, value)
+    
+    db.commit()
+    db.refresh(db_supplier)
+    
+    pending = db.query(func.sum(SupplierInvoice.total_amount - SupplierInvoice.paid_amount)).filter(
+        SupplierInvoice.supplier_id == db_supplier.id,
+        SupplierInvoice.status.in_(["pendiente", "parcial", "vencida"])
+    ).scalar() or 0
+    invoices_count = db.query(SupplierInvoice).filter(SupplierInvoice.supplier_id == db_supplier.id).count()
+    
+    return SupplierResponse(
+        id=db_supplier.id,
+        name=db_supplier.name,
+        contact_name=db_supplier.contact_name,
+        phone=db_supplier.phone,
+        email=db_supplier.email,
+        address=db_supplier.address,
+        notes=db_supplier.notes,
+        is_active=db_supplier.is_active,
+        created_at=db_supplier.created_at,
+        updated_at=db_supplier.updated_at,
+        invoices_count=invoices_count,
+        pending_amount=float(pending)
+    )
+
+@router.get("/supplier-invoices", response_model=List[SupplierInvoiceResponse])
+def get_supplier_invoices(
+    supplier_id: Optional[int] = None,
+    status: Optional[str] = None,
+    due_soon: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    query = db.query(SupplierInvoice)
+    
+    if supplier_id:
+        query = query.filter(SupplierInvoice.supplier_id == supplier_id)
+    if status:
+        query = query.filter(SupplierInvoice.status == status)
+    if due_soon:
+        soon = datetime.utcnow() + timedelta(days=7)
+        query = query.filter(
+            SupplierInvoice.due_date <= soon,
+            SupplierInvoice.status.in_(["pendiente", "parcial"])
+        )
+    
+    invoices = query.order_by(SupplierInvoice.due_date).all()
+    
+    # Auto-update status to "vencida" for overdue invoices
+    today = datetime.utcnow().date()
+    for inv in invoices:
+        if inv.status in ["pendiente", "parcial"] and inv.due_date < today:
+            inv.status = "vencida"
+            db.commit()
+    
+    result = []
+    for inv in invoices:
+        supplier = db.query(Supplier).filter(Supplier.id == inv.supplier_id).first()
+        payments = db.query(InvoicePayment).filter(InvoicePayment.invoice_id == inv.id).order_by(InvoicePayment.payment_date.desc()).all()
+        
+        result.append(SupplierInvoiceResponse(
+            id=inv.id,
+            supplier_id=inv.supplier_id,
+            invoice_number=inv.invoice_number,
+            issue_date=inv.issue_date,
+            due_date=inv.due_date,
+            total_amount=float(inv.total_amount),
+            paid_amount=float(inv.paid_amount),
+            payment_type=inv.payment_type,
+            status=inv.status,
+            image_url=inv.image_url,
+            notes=inv.notes,
+            created_at=inv.created_at,
+            updated_at=inv.updated_at,
+            supplier_name=supplier.name if supplier else "",
+            remaining_amount=float(inv.total_amount - inv.paid_amount),
+            payments=[InvoicePaymentResponse(
+                id=p.id,
+                invoice_id=p.invoice_id,
+                amount=float(p.amount),
+                payment_date=p.payment_date,
+                payment_method=p.payment_method,
+                reference=p.reference,
+                notes=p.notes,
+                created_at=p.created_at
+            ) for p in payments]
+        ))
+    return result
+
+@router.post("/supplier-invoices", response_model=SupplierInvoiceResponse)
+def create_supplier_invoice(
+    invoice: SupplierInvoiceCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    supplier = db.query(Supplier).filter(Supplier.id == invoice.supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
+    db_invoice = SupplierInvoice(
+        supplier_id=invoice.supplier_id,
+        invoice_number=invoice.invoice_number,
+        issue_date=invoice.issue_date,
+        due_date=invoice.due_date,
+        total_amount=invoice.total_amount,
+        payment_type=invoice.payment_type,
+        notes=invoice.notes,
+        status="pendiente"
+    )
+    db.add(db_invoice)
+    db.commit()
+    db.refresh(db_invoice)
+    
+    return SupplierInvoiceResponse(
+        id=db_invoice.id,
+        supplier_id=db_invoice.supplier_id,
+        invoice_number=db_invoice.invoice_number,
+        issue_date=db_invoice.issue_date,
+        due_date=db_invoice.due_date,
+        total_amount=float(db_invoice.total_amount),
+        paid_amount=0,
+        payment_type=db_invoice.payment_type,
+        status=db_invoice.status,
+        image_url=db_invoice.image_url,
+        notes=db_invoice.notes,
+        created_at=db_invoice.created_at,
+        updated_at=db_invoice.updated_at,
+        supplier_name=supplier.name,
+        remaining_amount=float(db_invoice.total_amount),
+        payments=[]
+    )
+
+@router.put("/supplier-invoices/{invoice_id}", response_model=SupplierInvoiceResponse)
+def update_supplier_invoice(
+    invoice_id: int,
+    invoice: SupplierInvoiceUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    db_invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == invoice_id).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    update_data = invoice.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_invoice, key, value)
+    
+    db.commit()
+    db.refresh(db_invoice)
+    
+    supplier = db.query(Supplier).filter(Supplier.id == db_invoice.supplier_id).first()
+    payments = db.query(InvoicePayment).filter(InvoicePayment.invoice_id == db_invoice.id).all()
+    
+    return SupplierInvoiceResponse(
+        id=db_invoice.id,
+        supplier_id=db_invoice.supplier_id,
+        invoice_number=db_invoice.invoice_number,
+        issue_date=db_invoice.issue_date,
+        due_date=db_invoice.due_date,
+        total_amount=float(db_invoice.total_amount),
+        paid_amount=float(db_invoice.paid_amount),
+        payment_type=db_invoice.payment_type,
+        status=db_invoice.status,
+        image_url=db_invoice.image_url,
+        notes=db_invoice.notes,
+        created_at=db_invoice.created_at,
+        updated_at=db_invoice.updated_at,
+        supplier_name=supplier.name if supplier else "",
+        remaining_amount=float(db_invoice.total_amount - db_invoice.paid_amount),
+        payments=[InvoicePaymentResponse(
+            id=p.id,
+            invoice_id=p.invoice_id,
+            amount=float(p.amount),
+            payment_date=p.payment_date,
+            payment_method=p.payment_method,
+            reference=p.reference,
+            notes=p.notes,
+            created_at=p.created_at
+        ) for p in payments]
+    )
+
+@router.post("/supplier-invoices/{invoice_id}/payments", response_model=SupplierInvoiceResponse)
+def add_invoice_payment(
+    invoice_id: int,
+    payment: InvoicePaymentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    db_invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == invoice_id).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    remaining = float(db_invoice.total_amount) - float(db_invoice.paid_amount)
+    if payment.amount > remaining:
+        raise HTTPException(status_code=400, detail=f"Payment amount exceeds remaining balance of {remaining}")
+    
+    db_payment = InvoicePayment(
+        invoice_id=invoice_id,
+        amount=payment.amount,
+        payment_method=payment.payment_method,
+        reference=payment.reference,
+        notes=payment.notes
+    )
+    db.add(db_payment)
+    
+    db_invoice.paid_amount = float(db_invoice.paid_amount) + payment.amount
+    
+    if db_invoice.paid_amount >= float(db_invoice.total_amount):
+        db_invoice.status = "pagada"
+    elif db_invoice.paid_amount > 0:
+        db_invoice.status = "parcial"
+    
+    db.commit()
+    db.refresh(db_invoice)
+    
+    supplier = db.query(Supplier).filter(Supplier.id == db_invoice.supplier_id).first()
+    payments = db.query(InvoicePayment).filter(InvoicePayment.invoice_id == db_invoice.id).order_by(InvoicePayment.payment_date.desc()).all()
+    
+    return SupplierInvoiceResponse(
+        id=db_invoice.id,
+        supplier_id=db_invoice.supplier_id,
+        invoice_number=db_invoice.invoice_number,
+        issue_date=db_invoice.issue_date,
+        due_date=db_invoice.due_date,
+        total_amount=float(db_invoice.total_amount),
+        paid_amount=float(db_invoice.paid_amount),
+        payment_type=db_invoice.payment_type,
+        status=db_invoice.status,
+        image_url=db_invoice.image_url,
+        notes=db_invoice.notes,
+        created_at=db_invoice.created_at,
+        updated_at=db_invoice.updated_at,
+        supplier_name=supplier.name if supplier else "",
+        remaining_amount=float(db_invoice.total_amount - db_invoice.paid_amount),
+        payments=[InvoicePaymentResponse(
+            id=p.id,
+            invoice_id=p.invoice_id,
+            amount=float(p.amount),
+            payment_date=p.payment_date,
+            payment_method=p.payment_method,
+            reference=p.reference,
+            notes=p.notes,
+            created_at=p.created_at
+        ) for p in payments]
+    )
+
+@router.get("/supplier-invoices/summary", response_model=SupplierInvoiceSummary)
+def get_invoice_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    now = datetime.utcnow()
+    soon = now + timedelta(days=7)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    pending = db.query(func.sum(SupplierInvoice.total_amount - SupplierInvoice.paid_amount)).filter(
+        SupplierInvoice.status.in_(["pendiente", "parcial"])
+    ).scalar() or 0
+    
+    overdue = db.query(func.sum(SupplierInvoice.total_amount - SupplierInvoice.paid_amount)).filter(
+        SupplierInvoice.status == "vencida"
+    ).scalar() or 0
+    
+    paid_this_month = db.query(func.sum(InvoicePayment.amount)).filter(
+        InvoicePayment.payment_date >= month_start
+    ).scalar() or 0
+    
+    pending_count = db.query(SupplierInvoice).filter(
+        SupplierInvoice.status.in_(["pendiente", "parcial"])
+    ).count()
+    
+    overdue_count = db.query(SupplierInvoice).filter(
+        SupplierInvoice.status == "vencida"
+    ).count()
+    
+    due_soon_count = db.query(SupplierInvoice).filter(
+        SupplierInvoice.due_date <= soon,
+        SupplierInvoice.due_date > now,
+        SupplierInvoice.status.in_(["pendiente", "parcial"])
+    ).count()
+    
+    return SupplierInvoiceSummary(
+        total_pending=float(pending),
+        total_overdue=float(overdue),
+        total_paid_this_month=float(paid_this_month),
+        invoices_pending_count=pending_count,
+        invoices_overdue_count=overdue_count,
+        invoices_due_soon_count=due_soon_count
+    )
+
+@router.post("/supplier-invoices/{invoice_id}/image")
+async def upload_invoice_image(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    db_invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == invoice_id).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    return {"message": "Use PUT /supplier-invoices/{id} with image_url field to update image"}
+
+@router.delete("/supplier-invoices/{invoice_id}")
+def delete_supplier_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    db_invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == invoice_id).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    db.query(InvoicePayment).filter(InvoicePayment.invoice_id == invoice_id).delete()
+    db.delete(db_invoice)
+    db.commit()
+    
+    return {"message": "Invoice deleted successfully"}

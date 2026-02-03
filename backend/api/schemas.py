@@ -403,3 +403,114 @@ class DashboardStats(BaseModel):
     sales_count_month: int = 0
     average_ticket: float = 0
     inventory_value: float = 0
+    pending_invoices: int = 0
+    pending_invoices_amount: float = 0
+    overdue_invoices: int = 0
+
+class InvoiceStatus(str, Enum):
+    PENDING = "pendiente"
+    PARTIAL = "parcial"
+    PAID = "pagada"
+    OVERDUE = "vencida"
+    CANCELLED = "cancelada"
+
+class InvoicePaymentType(str, Enum):
+    EFECTIVO = "efectivo"
+    TRANSFERENCIA = "transferencia"
+    CREDITO = "credito"
+    CHEQUE = "cheque"
+    OTRO = "otro"
+
+class SupplierBase(BaseModel):
+    name: str
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+
+class SupplierCreate(SupplierBase):
+    pass
+
+class SupplierUpdate(BaseModel):
+    name: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class SupplierResponse(SupplierBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    invoices_count: int = 0
+    pending_amount: float = 0
+
+    class Config:
+        from_attributes = True
+
+class SupplierInvoiceBase(BaseModel):
+    supplier_id: int
+    invoice_number: str
+    issue_date: datetime
+    due_date: datetime
+    total_amount: float
+    payment_type: str = "efectivo"
+    notes: Optional[str] = None
+
+class SupplierInvoiceCreate(SupplierInvoiceBase):
+    pass
+
+class SupplierInvoiceUpdate(BaseModel):
+    invoice_number: Optional[str] = None
+    issue_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    total_amount: Optional[float] = None
+    payment_type: Optional[str] = None
+    status: Optional[str] = None
+    image_url: Optional[str] = None
+    notes: Optional[str] = None
+
+class InvoicePaymentCreate(BaseModel):
+    amount: float
+    payment_method: Optional[str] = None
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+
+class InvoicePaymentResponse(BaseModel):
+    id: int
+    invoice_id: int
+    amount: float
+    payment_date: datetime
+    payment_method: Optional[str]
+    reference: Optional[str]
+    notes: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class SupplierInvoiceResponse(SupplierInvoiceBase):
+    id: int
+    paid_amount: float
+    status: str
+    image_url: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    supplier_name: str = ""
+    remaining_amount: float = 0
+    payments: List[InvoicePaymentResponse] = []
+
+    class Config:
+        from_attributes = True
+
+class SupplierInvoiceSummary(BaseModel):
+    total_pending: float
+    total_overdue: float
+    total_paid_this_month: float
+    invoices_pending_count: int
+    invoices_overdue_count: int
+    invoices_due_soon_count: int

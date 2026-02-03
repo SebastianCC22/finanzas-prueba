@@ -301,6 +301,64 @@ class ApiClient {
   getClosingReportUrl(closingId: number) {
     return `${API_BASE}/reports/closing/${closingId}/export`;
   }
+
+  async getSuppliers(activeOnly: boolean = true) {
+    return this.request<Supplier[]>(`/suppliers?active_only=${activeOnly}`);
+  }
+
+  async createSupplier(supplier: SupplierCreate) {
+    return this.request<Supplier>('/suppliers', {
+      method: 'POST',
+      body: supplier,
+    });
+  }
+
+  async updateSupplier(id: number, supplier: Partial<SupplierCreate & { is_active: boolean }>) {
+    return this.request<Supplier>(`/suppliers/${id}`, {
+      method: 'PUT',
+      body: supplier,
+    });
+  }
+
+  async getSupplierInvoices(params: { supplierId?: number; status?: string; dueSoon?: boolean } = {}) {
+    const queryParams = new URLSearchParams();
+    if (params.supplierId) queryParams.append('supplier_id', params.supplierId.toString());
+    if (params.status) queryParams.append('status', params.status);
+    if (params.dueSoon) queryParams.append('due_soon', 'true');
+    const query = queryParams.toString();
+    return this.request<SupplierInvoice[]>(`/supplier-invoices${query ? `?${query}` : ''}`);
+  }
+
+  async createSupplierInvoice(invoice: SupplierInvoiceCreate) {
+    return this.request<SupplierInvoice>('/supplier-invoices', {
+      method: 'POST',
+      body: invoice,
+    });
+  }
+
+  async updateSupplierInvoice(id: number, invoice: Partial<SupplierInvoiceCreate & { status: string; image_url: string }>) {
+    return this.request<SupplierInvoice>(`/supplier-invoices/${id}`, {
+      method: 'PUT',
+      body: invoice,
+    });
+  }
+
+  async deleteSupplierInvoice(id: number) {
+    return this.request<{ message: string }>(`/supplier-invoices/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addInvoicePayment(invoiceId: number, payment: InvoicePaymentCreate) {
+    return this.request<SupplierInvoice>(`/supplier-invoices/${invoiceId}/payments`, {
+      method: 'POST',
+      body: payment,
+    });
+  }
+
+  async getInvoiceSummary() {
+    return this.request<SupplierInvoiceSummary>('/supplier-invoices/summary');
+  }
 }
 
 export const api = new ApiClient();
@@ -714,4 +772,84 @@ export interface AdvancedStats {
   stores: StoreStats[];
   top_products: TopProduct[];
   least_sold_products: TopProduct[];
+}
+
+export interface Supplier {
+  id: number;
+  name: string;
+  contact_name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  invoices_count: number;
+  pending_amount: number;
+}
+
+export interface SupplierCreate {
+  name: string;
+  contact_name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+}
+
+export interface InvoicePayment {
+  id: number;
+  invoice_id: number;
+  amount: number;
+  payment_date: string;
+  payment_method?: string;
+  reference?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface SupplierInvoice {
+  id: number;
+  supplier_id: number;
+  invoice_number: string;
+  issue_date: string;
+  due_date: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_type: string;
+  status: string;
+  image_url?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  supplier_name: string;
+  remaining_amount: number;
+  payments: InvoicePayment[];
+}
+
+export interface SupplierInvoiceCreate {
+  supplier_id: number;
+  invoice_number: string;
+  issue_date: string;
+  due_date: string;
+  total_amount: number;
+  payment_type?: string;
+  notes?: string;
+}
+
+export interface InvoicePaymentCreate {
+  amount: number;
+  payment_method?: string;
+  reference?: string;
+  notes?: string;
+}
+
+export interface SupplierInvoiceSummary {
+  total_pending: number;
+  total_overdue: number;
+  total_paid_this_month: number;
+  invoices_pending_count: number;
+  invoices_overdue_count: number;
+  invoices_due_soon_count: number;
 }

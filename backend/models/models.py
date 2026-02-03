@@ -38,6 +38,22 @@ class AlertType(str, enum.Enum):
     NEGATIVE_BALANCE = "negative_balance"
     OPENING_PENDING = "opening_pending"
     CLOSING_PENDING = "closing_pending"
+    INVOICE_DUE_SOON = "invoice_due_soon"
+    INVOICE_OVERDUE = "invoice_overdue"
+
+class InvoiceStatus(str, enum.Enum):
+    PENDING = "pendiente"
+    PARTIAL = "parcial"
+    PAID = "pagada"
+    OVERDUE = "vencida"
+    CANCELLED = "cancelada"
+
+class InvoicePaymentType(str, enum.Enum):
+    EFECTIVO = "efectivo"
+    TRANSFERENCIA = "transferencia"
+    CREDITO = "credito"
+    CHEQUE = "cheque"
+    OTRO = "otro"
 
 class User(Base):
     __tablename__ = "users"
@@ -321,3 +337,53 @@ class Backup(Base):
     cloud_url = Column(String(500))
     status = Column(String(20), default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Supplier(Base):
+    __tablename__ = "suppliers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    contact_name = Column(String(255))
+    phone = Column(String(50))
+    email = Column(String(255))
+    address = Column(Text)
+    notes = Column(Text)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    invoices = relationship("SupplierInvoice", back_populates="supplier")
+
+class SupplierInvoice(Base):
+    __tablename__ = "supplier_invoices"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
+    invoice_number = Column(String(100), nullable=False)
+    issue_date = Column(DateTime, nullable=False)
+    due_date = Column(DateTime, nullable=False)
+    total_amount = Column(Numeric(15, 2), nullable=False)
+    paid_amount = Column(Numeric(15, 2), default=0)
+    payment_type = Column(String(20), default="efectivo")
+    status = Column(String(20), default="pendiente")
+    image_url = Column(String(500))
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    supplier = relationship("Supplier", back_populates="invoices")
+    payments = relationship("InvoicePayment", back_populates="invoice")
+
+class InvoicePayment(Base):
+    __tablename__ = "invoice_payments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("supplier_invoices.id"), nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
+    payment_date = Column(DateTime, default=datetime.utcnow)
+    payment_method = Column(String(50))
+    reference = Column(String(100))
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    invoice = relationship("SupplierInvoice", back_populates="payments")

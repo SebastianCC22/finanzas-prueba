@@ -17,11 +17,12 @@ import Inventario from "@/pages/inventario";
 import Apertura from "@/pages/apertura";
 import Cierre from "@/pages/cierre";
 import Reportes from "@/pages/reportes";
+import Proveedores from "@/pages/proveedores";
 import Layout from "@/components/layout";
 import NotFound from "@/pages/not-found";
 
-function PrivateRoute({ component: Component, requireStore = true, ...rest }: any) {
-  const { isAuthenticated, checkAuth, currentStore } = useAuthStore();
+function PrivateRoute({ component: Component, requireStore = true, adminOnly = false, ...rest }: any) {
+  const { isAuthenticated, checkAuth, currentStore, user } = useAuthStore();
   const [, setLocation] = useLocation();
   const [isChecking, setIsChecking] = useState(true);
   const [shouldRedirect, setShouldRedirect] = useState<string | null>(null);
@@ -42,8 +43,10 @@ function PrivateRoute({ component: Component, requireStore = true, ...rest }: an
       setShouldRedirect("/login");
     } else if (!isChecking && requireStore && !currentStore) {
       setShouldRedirect("/select-store");
+    } else if (!isChecking && adminOnly && user?.role !== "admin") {
+      setShouldRedirect("/");
     }
-  }, [isChecking, isAuthenticated, currentStore, requireStore]);
+  }, [isChecking, isAuthenticated, currentStore, requireStore, adminOnly, user]);
 
   useEffect(() => {
     if (shouldRedirect) {
@@ -59,7 +62,7 @@ function PrivateRoute({ component: Component, requireStore = true, ...rest }: an
     );
   }
 
-  if (!isAuthenticated || (requireStore && !currentStore)) {
+  if (!isAuthenticated || (requireStore && !currentStore) || (adminOnly && user?.role !== "admin")) {
     return null;
   }
 
@@ -138,6 +141,10 @@ function Router() {
 
       <Route path="/reportes">
         {() => <PrivateRoute component={Reportes} />}
+      </Route>
+
+      <Route path="/proveedores">
+        {() => <PrivateRoute component={Proveedores} adminOnly={true} />}
       </Route>
 
       <Route component={NotFound} />

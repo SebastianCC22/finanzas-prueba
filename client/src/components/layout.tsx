@@ -17,7 +17,8 @@ import {
   Truck,
   BarChart3,
   Bell,
-  User
+  User,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: "/traspasos-productos", label: "Traspasos", icon: Truck },
     { href: "/cierre", label: "Cierre", icon: Calculator },
     { href: "/inventario", label: "Inventario", icon: Package, adminOnly: true },
+    { href: "/proveedores", label: "Proveedores", icon: Building2, adminOnly: true },
     { href: "/reportes", label: "Reportes", icon: BarChart3 },
   ];
 
