@@ -131,12 +131,7 @@ class SaleItemCreate(BaseModel):
     product_id: Optional[int] = None
     product_name: str
     quantity: int
-    original_price: float
-    final_price: float
-    discount_amount: float = 0
-    discount_percent: float = 0
-    discount_reason: Optional[str] = None
-    has_iva: bool = False
+    unit_price: float
 
 class PaymentCreate(BaseModel):
     cash_register_id: int
@@ -147,8 +142,7 @@ class SaleCreate(BaseModel):
     store_id: int
     items: List[SaleItemCreate]
     payments: List[PaymentCreate]
-    global_discount: float = 0
-    global_discount_reason: Optional[str] = None
+    total_to_charge: float
     notes: Optional[str] = None
 
 class SaleItemResponse(BaseModel):
@@ -158,11 +152,7 @@ class SaleItemResponse(BaseModel):
     quantity: int
     original_price: float
     final_price: float
-    discount_amount: float
-    discount_percent: float
-    discount_reason: Optional[str]
-    has_iva: bool
-    iva_amount: float
+    cost_base: float = 0
     subtotal: float
 
     class Config:
@@ -185,11 +175,9 @@ class SaleResponse(BaseModel):
     user_id: int
     sale_number: str
     subtotal: float
-    tax_total: float
-    discount_total: float
-    global_discount: float
-    global_discount_reason: Optional[str]
     total: float
+    cost_total: float = 0
+    profit: float = 0
     status: str
     notes: Optional[str]
     created_at: datetime

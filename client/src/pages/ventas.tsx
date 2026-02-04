@@ -1,24 +1,25 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { api, Product, CashRegister, SaleItemCreate, PaymentCreate, Sale } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, Percent, X, Check, History, Eye } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, History, Eye, Check } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RequireOpening } from "@/components/require-opening";
 
-interface CartItem extends SaleItemCreate {
+interface CartItem {
   id: string;
+  product_id?: number;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
 }
 
 const PAYMENT_METHODS = [
@@ -31,34 +32,35 @@ const PAYMENT_METHODS = [
 function VentasContent() {
   const { currentStore } = useAuthStore();
   const { toast } = useToast();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   const [products, setProducts] = useState<Product[]>([]);
   const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [payments, setPayments] = useState<{ method: string; amount: number; registerId: number }[]>([]);
-  const [globalDiscount, setGlobalDiscount] = useState(0);
-  const [globalDiscountReason, setGlobalDiscountReason] = useState("");
+  const [totalToCharge, setTotalToCharge] = useState("");
   const [notes, setNotes] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [showDiscountDialog, setShowDiscountDialog] = useState(false);
-  const [selectedItemForDiscount, setSelectedItemForDiscount] = useState<string | null>(null);
-  const [itemDiscount, setItemDiscount] = useState({ amount: 0, percent: 0, reason: "" });
   const [hasOpening, setHasOpening] = useState(false);
   const [activeTab, setActiveTab] = useState("pos");
   const [salesHistory, setSalesHistory] = useState<Sale[]>([]);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [showSaleDetails, setShowSaleDetails] = useState(false);
-  const [cashReceived, setCashReceived] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
 
   useEffect(() => {
     if (currentStore) {
       loadData();
     }
   }, [currentStore]);
+
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, []);
 
   const loadData = async () => {
     if (!currentStore) return;
@@ -92,20 +94,6 @@ function VentasContent() {
     }
   };
 
-  const viewSaleDetails = async (sale: Sale) => {
-    try {
-      const fullSale = await api.getSale(sale.id);
-      setSelectedSale(fullSale);
-      setShowSaleDetails(true);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("es-CO", {
       style: "currency",
@@ -115,14 +103,14 @@ function VentasContent() {
   };
 
   const filteredProducts = useMemo(() => {
-    if (!searchTerm) return products.slice(0, 20);
+    if (!searchTerm) return [];
     const term = searchTerm.toLowerCase();
     return products.filter(
       (p) =>
         p.name.toLowerCase().includes(term) ||
         p.brand?.toLowerCase().includes(term) ||
         p.supplier?.toLowerCase().includes(term)
-    ).slice(0, 20);
+    ).slice(0, 10);
   }, [products, searchTerm]);
 
   const addToCart = (product: Product) => {
@@ -142,26 +130,23 @@ function VentasContent() {
         product_id: product.id,
         product_name: product.name,
         quantity: 1,
-        original_price: product.sale_price,
-        final_price: product.sale_price,
-        discount_amount: 0,
-        discount_percent: 0,
-        discount_reason: "",
-        has_iva: product.has_iva,
+        unit_price: product.sale_price,
       };
       setCart([...cart, newItem]);
     }
+    setSearchTerm("");
+    searchInputRef.current?.focus();
   };
 
-  const updateQuantity = (itemId: string, delta: number) => {
+  const updateQuantity = (itemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(itemId);
+      return;
+    }
     setCart(
-      cart
-        .map((item) =>
-          item.id === itemId
-            ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
+      cart.map((item) =>
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      )
     );
   };
 
@@ -169,77 +154,22 @@ function VentasContent() {
     setCart(cart.filter((item) => item.id !== itemId));
   };
 
-  const openDiscountDialog = (itemId: string) => {
-    const item = cart.find((i) => i.id === itemId);
-    if (item) {
-      setSelectedItemForDiscount(itemId);
-      setItemDiscount({
-        amount: item.discount_amount || 0,
-        percent: item.discount_percent || 0,
-        reason: item.discount_reason || "",
-      });
-      setShowDiscountDialog(true);
-    }
-  };
-
-  const applyItemDiscount = () => {
-    if (!selectedItemForDiscount) return;
-    
-    setCart(
-      cart.map((item) => {
-        if (item.id === selectedItemForDiscount) {
-          let finalPrice = item.original_price;
-          if (itemDiscount.percent > 0) {
-            finalPrice = item.original_price * (1 - itemDiscount.percent / 100);
-          } else if (itemDiscount.amount > 0) {
-            finalPrice = item.original_price - itemDiscount.amount;
-          }
-          return {
-            ...item,
-            final_price: Math.max(0, finalPrice),
-            discount_amount: itemDiscount.amount,
-            discount_percent: itemDiscount.percent,
-            discount_reason: itemDiscount.reason,
-          };
-        }
-        return item;
-      })
-    );
-    
-    setShowDiscountDialog(false);
-    setSelectedItemForDiscount(null);
-    setItemDiscount({ amount: 0, percent: 0, reason: "" });
-  };
-
-  const subtotal = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.final_price * item.quantity, 0);
+  const calculatedTotal = useMemo(() => {
+    return cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
   }, [cart]);
 
-  const taxTotal = useMemo(() => {
-    return cart.reduce((sum, item) => {
-      if (item.has_iva) {
-        return sum + item.final_price * item.quantity * 0.19;
-      }
-      return sum;
-    }, 0);
-  }, [cart]);
-
-  const total = useMemo(() => {
-    return subtotal - globalDiscount;
-  }, [subtotal, globalDiscount]);
+  const finalTotal = useMemo(() => {
+    const parsed = parseFloat(totalToCharge);
+    return isNaN(parsed) ? calculatedTotal : parsed;
+  }, [totalToCharge, calculatedTotal]);
 
   const totalPaid = useMemo(() => {
     return payments.reduce((sum, p) => sum + p.amount, 0);
   }, [payments]);
 
   const remaining = useMemo(() => {
-    return Math.max(0, total - totalPaid);
-  }, [total, totalPaid]);
-
-  const change = useMemo(() => {
-    const received = parseFloat(cashReceived) || 0;
-    return Math.max(0, received - total);
-  }, [cashReceived, total]);
+    return Math.max(0, finalTotal - totalPaid);
+  }, [finalTotal, totalPaid]);
 
   const getRegisterForMethod = (method: string) => {
     return cashRegisters.find(
@@ -247,7 +177,7 @@ function VentasContent() {
     );
   };
 
-  const addPayment = (method: string, amount: number) => {
+  const addPayment = (method: string) => {
     const register = getRegisterForMethod(method);
     if (!register) {
       toast({
@@ -258,42 +188,42 @@ function VentasContent() {
       return;
     }
     
+    const amount = parseFloat(paymentAmount) || remaining;
+    if (amount <= 0) return;
+    
     setPayments([...payments, { method, amount, registerId: register.id }]);
+    setPaymentAmount("");
   };
 
   const removePayment = (index: number) => {
     setPayments(payments.filter((_, i) => i !== index));
   };
 
-  const processSale = async () => {
+  const openPaymentDialog = () => {
     if (cart.length === 0) {
-      toast({
-        title: "Error",
-        description: "El carrito está vacío",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "El carrito está vacío", variant: "destructive" });
       return;
     }
-
     if (!hasOpening) {
-      toast({
-        title: "Error",
-        description: "Debe realizar la apertura de caja primero",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Debe realizar la apertura de caja primero", variant: "destructive" });
       return;
     }
+    setTotalToCharge(calculatedTotal.toString());
+    setPayments([]);
+    setShowPaymentDialog(true);
+  };
 
-    if (totalPaid < total) {
+  const processSale = async () => {
+    if (cart.length === 0 || !currentStore) return;
+
+    if (Math.abs(totalPaid - finalTotal) > 0.01) {
       toast({
         title: "Fondos insuficientes",
-        description: `Fondo insuficiente. Total: ${formatCurrency(total)} - Pagado: ${formatCurrency(totalPaid)} - Falta: ${formatCurrency(total - totalPaid)}`,
+        description: `Los pagos ($${totalPaid.toLocaleString()}) no cubren el total ($${finalTotal.toLocaleString()})`,
         variant: "destructive",
       });
       return;
     }
-
-    if (!currentStore) return;
 
     setIsProcessing(true);
     try {
@@ -301,12 +231,7 @@ function VentasContent() {
         product_id: item.product_id,
         product_name: item.product_name,
         quantity: item.quantity,
-        original_price: item.original_price,
-        final_price: item.final_price,
-        discount_amount: item.discount_amount,
-        discount_percent: item.discount_percent,
-        discount_reason: item.discount_reason,
-        has_iva: item.has_iva,
+        unit_price: item.unit_price,
       }));
 
       const salePayments: PaymentCreate[] = payments.map((p) => ({
@@ -319,32 +244,33 @@ function VentasContent() {
         store_id: currentStore.id,
         items: saleItems,
         payments: salePayments,
-        global_discount: globalDiscount,
-        global_discount_reason: globalDiscountReason,
-        notes,
+        total_to_charge: finalTotal,
+        notes: notes || undefined,
       });
 
-      toast({
-        title: "Venta exitosa",
-        description: "La venta se ha registrado correctamente",
-      });
+      toast({ title: "Venta exitosa", description: "La venta se ha registrado correctamente" });
 
       setCart([]);
       setPayments([]);
-      setGlobalDiscount(0);
-      setCashReceived("");
-      setGlobalDiscountReason("");
+      setTotalToCharge("");
       setNotes("");
       setShowPaymentDialog(false);
       loadData();
+      searchInputRef.current?.focus();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const viewSaleDetails = async (sale: Sale) => {
+    try {
+      const fullSale = await api.getSale(sale.id);
+      setSelectedSale(fullSale);
+      setShowSaleDetails(true);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -374,169 +300,144 @@ function VentasContent() {
         </TabsList>
 
         <TabsContent value="pos" className="mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Buscar Producto</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre, marca o proveedor..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search-product"
-                />
-              </div>
-              <div className="mt-4 max-h-64 overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Producto</TableHead>
-                      <TableHead>Stock</TableHead>
-                      <TableHead className="text-right">Precio</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProducts.map((product) => (
-                      <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
-                        <TableCell>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Search className="h-5 w-5" />
+                    Buscar Producto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Escriba nombre, marca o código..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="text-lg h-12"
+                    data-testid="input-search-product"
+                    autoFocus
+                  />
+                  {filteredProducts.length > 0 && (
+                    <div className="mt-2 border rounded-lg max-h-80 overflow-y-auto">
+                      {filteredProducts.map((product) => (
+                        <div
+                          key={product.id}
+                          className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                          onClick={() => addToCart(product)}
+                          data-testid={`row-product-${product.id}`}
+                        >
                           <div>
                             <p className="font-medium">{product.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {product.brand} - {product.presentation}
+                              {product.brand} • Stock: {product.quantity}
                             </p>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={product.quantity > 0 ? "secondary" : "destructive"}>
-                            {product.quantity}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ${product.sale_price.toLocaleString()}
-                          {product.has_iva && (
-                            <span className="text-xs text-blue-500 ml-1">+IVA</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => addToCart(product)}
-                            disabled={product.quantity === 0}
-                            data-testid={`button-add-${product.id}`}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                Carrito
-              </CardTitle>
-              <Badge variant="secondary">{cart.length} items</Badge>
-            </CardHeader>
-            <CardContent>
-              {cart.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8" data-testid="text-empty-cart">
-                  Carrito vacío
-                </p>
-              ) : (
-                <div className="space-y-3 max-h-80 overflow-y-auto">
-                  {cart.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
-                      data-testid={`cart-item-${item.id}`}
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{item.product_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          ${item.final_price.toLocaleString()} x {item.quantity}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => updateQuantity(item.id, -1)}
-                          data-testid={`button-decrease-${item.id}`}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-6 text-center text-sm">{item.quantity}</span>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => updateQuantity(item.id, 1)}
-                          data-testid={`button-increase-${item.id}`}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-destructive"
-                          onClick={() => removeFromCart(item.id)}
-                          data-testid={`button-remove-${item.id}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                          <div className="text-right">
+                            <p className="font-bold text-lg">${product.sale_price.toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-              <div className="mt-4 pt-4 border-t space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>${subtotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>IVA (informativo):</span>
-                  <span>${taxTotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span data-testid="text-total">${total.toLocaleString()}</span>
-                </div>
-              </div>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5" />
+                    Carrito
+                  </CardTitle>
+                  <Badge variant="secondary">{cart.length} items</Badge>
+                </CardHeader>
+                <CardContent>
+                  {cart.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8" data-testid="text-empty-cart">
+                      Carrito vacío - Busque un producto arriba
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {cart.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
+                          data-testid={`cart-item-${item.id}`}
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.product_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              ${item.unit_price.toLocaleString()} c/u
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8"
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              data-testid={`button-decrease-${item.id}`}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 0)}
+                              className="w-14 h-8 text-center"
+                              data-testid={`input-quantity-${item.id}`}
+                            />
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              data-testid={`button-increase-${item.id}`}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => removeFromCart(item.id)}
+                              data-testid={`button-remove-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="font-bold ml-2 w-24 text-right">
+                            ${(item.unit_price * item.quantity).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-              <div className="mt-4 space-y-2">
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={() => setShowPaymentDialog(true)}
-                  disabled={cart.length === 0 || !hasOpening}
-                  data-testid="button-pay"
-                >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Pagar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex justify-between items-center text-2xl font-bold">
+                      <span>TOTAL:</span>
+                      <span data-testid="text-total">${calculatedTotal.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    className="w-full mt-4 h-14 text-xl"
+                    size="lg"
+                    onClick={openPaymentDialog}
+                    disabled={cart.length === 0 || !hasOpening}
+                    data-testid="button-pay"
+                  >
+                    <CreditCard className="h-6 w-6 mr-2" />
+                    COBRAR
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
@@ -544,272 +445,101 @@ function VentasContent() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5" />
-                Historial de Ventas
+                Historial de Ventas de Hoy
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {salesHistory.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No hay ventas registradas
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>No. Venta</TableHead>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {salesHistory.map((sale) => (
-                        <TableRow key={sale.id} data-testid={`sale-row-${sale.id}`}>
-                          <TableCell className="font-mono text-sm">
-                            {sale.sale_number}
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(sale.created_at), "PPp", { locale: es })}
-                          </TableCell>
-                          <TableCell className="text-right font-bold">
-                            {formatCurrency(sale.total)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={sale.status === "completed" ? "default" : "secondary"}>
-                              {sale.status === "completed" ? "Completada" : sale.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => viewSaleDetails(sale)}
-                              data-testid={`view-sale-${sale.id}`}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>No. Venta</TableHead>
+                    <TableHead>Hora</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Ganancia</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {salesHistory.map((sale) => (
+                    <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
+                      <TableCell className="font-medium">{sale.sale_number}</TableCell>
+                      <TableCell>{format(new Date(sale.created_at), "HH:mm", { locale: es })}</TableCell>
+                      <TableCell className="text-right font-bold">
+                        {formatCurrency(sale.total)}
+                      </TableCell>
+                      <TableCell className="text-right text-green-600 font-medium">
+                        {formatCurrency(sale.profit)}
+                      </TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => viewSaleDetails(sale)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {salesHistory.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No hay ventas registradas hoy
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      <Dialog open={showSaleDetails} onOpenChange={setShowSaleDetails}>
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Detalle de Venta {selectedSale?.sale_number}</DialogTitle>
+            <DialogTitle className="text-xl">Procesar Pago</DialogTitle>
           </DialogHeader>
-          {selectedSale && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Fecha:</span>
-                  <p className="font-medium">
-                    {format(new Date(selectedSale.created_at), "PPp", { locale: es })}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Estado:</span>
-                  <p>
-                    <Badge variant={selectedSale.status === "completed" ? "default" : "secondary"}>
-                      {selectedSale.status === "completed" ? "Completada" : selectedSale.status}
-                    </Badge>
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-medium mb-2">Productos</h4>
-                <div className="border rounded-lg divide-y">
-                  {selectedSale.items.map((item) => (
-                    <div key={item.id} className="p-3 flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatCurrency(item.final_price)} x {item.quantity}
-                        </p>
-                      </div>
-                      <span className="font-mono font-bold">
-                        {formatCurrency(item.subtotal)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-t pt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(selectedSale.subtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>IVA (informativo):</span>
-                  <span>{formatCurrency(selectedSale.tax_total)}</span>
-                </div>
-                {selectedSale.discount_total > 0 && (
-                  <div className="flex justify-between text-sm text-green-500">
-                    <span>Descuentos:</span>
-                    <span>-{formatCurrency(selectedSale.discount_total)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span>{formatCurrency(selectedSale.total)}</span>
-                </div>
-              </div>
-
-              {selectedSale.payments.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Pagos</h4>
-                  <div className="space-y-1">
-                    {selectedSale.payments.map((payment) => (
-                      <div key={payment.id} className="flex justify-between text-sm p-2 bg-muted rounded">
-                        <span className="capitalize">{payment.payment_method}</span>
-                        <span className="font-mono">{formatCurrency(payment.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedSale.notes && (
-                <div>
-                  <h4 className="font-medium mb-1">Notas</h4>
-                  <p className="text-sm text-muted-foreground">{selectedSale.notes}</p>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSaleDetails(false)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Procesar Pago</DialogTitle>
-          </DialogHeader>
+          
           <div className="space-y-4">
-            <div className="p-4 bg-muted rounded-lg space-y-2">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total a pagar:</span>
-                <span>${total.toLocaleString()}</span>
-              </div>
-              {totalPaid > 0 && (
-                <>
-                  <div className="flex justify-between text-sm text-green-500">
-                    <span>Pagado:</span>
-                    <span>${totalPaid.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-medium">
-                    <span>Restante:</span>
-                    <span>${remaining.toLocaleString()}</span>
-                  </div>
-                </>
-              )}
+            <div className="bg-muted p-4 rounded-lg">
+              <label className="text-sm text-muted-foreground">Total calculado</label>
+              <p className="text-lg">${calculatedTotal.toLocaleString()}</p>
             </div>
 
-            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="cashReceived" className="text-emerald-700 dark:text-emerald-300">
-                  Dinero Recibido (Efectivo)
-                </Label>
-                <Input
-                  id="cashReceived"
-                  type="number"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
-                  placeholder="0"
-                  className="text-lg font-mono"
-                  data-testid="input-cash-received"
-                />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {[1000, 2000, 5000, 10000, 20000, 50000, 100000].map((amount) => (
-                    <Button
-                      key={amount}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-xs font-mono"
-                      onClick={() => setCashReceived(amount.toString())}
-                      data-testid={`button-preset-${amount}`}
-                    >
-                      ${amount.toLocaleString()}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              {parseFloat(cashReceived) > 0 && (
-                <div className="flex justify-between items-center p-3 bg-white dark:bg-emerald-900 rounded-lg">
-                  <span className="font-medium text-emerald-700 dark:text-emerald-300">Cambio:</span>
-                  <span className="text-2xl font-bold font-mono text-emerald-600" data-testid="text-change">
-                    ${change.toLocaleString()}
-                  </span>
-                </div>
-              )}
+            <div>
+              <label className="text-sm font-medium">TOTAL A COBRAR</label>
+              <Input
+                type="number"
+                value={totalToCharge}
+                onChange={(e) => setTotalToCharge(e.target.value)}
+                className="text-2xl h-14 font-bold text-center"
+                placeholder={calculatedTotal.toString()}
+                data-testid="input-total-to-charge"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Escriba el monto final que cobrará al cliente
+              </p>
             </div>
 
-            <div className="space-y-3">
-              <Label>Agregar Pago</Label>
-              <div className="flex gap-2">
+            <div className="border-t pt-4">
+              <div className="flex items-center gap-2 mb-3">
                 <Input
                   type="number"
+                  placeholder="Monto"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
-                  placeholder="Monto"
-                  className="flex-1 font-mono"
+                  className="flex-1"
                   data-testid="input-payment-amount"
                 />
-                <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
-                  <SelectTrigger className="w-32" data-testid="select-payment-method">
-                    <SelectValue placeholder="Método" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map((method) => (
-                      <SelectItem key={method.id} value={method.id}>
-                        {method.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const amount = parseFloat(paymentAmount) || 0;
-                    if (amount > 0 && selectedPaymentMethod) {
-                      addPayment(selectedPaymentMethod, amount);
-                      setPaymentAmount("");
-                    }
-                  }}
-                  disabled={!selectedPaymentMethod || !paymentAmount || parseFloat(paymentAmount) <= 0}
-                  data-testid="button-add-payment"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
               </div>
-              <div className="flex flex-wrap gap-1">
-                {[remaining, 5000, 10000, 20000, 50000].filter(v => v > 0).map((preset, idx) => (
+              <div className="grid grid-cols-2 gap-2">
+                {PAYMENT_METHODS.map((method) => (
                   <Button
-                    key={idx}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs font-mono h-7"
-                    onClick={() => setPaymentAmount(preset.toString())}
+                    key={method.id}
+                    variant="outline"
+                    className="h-14 text-lg"
+                    onClick={() => addPayment(method.id)}
+                    data-testid={`button-method-${method.id}`}
                   >
-                    {idx === 0 && remaining > 0 ? `Todo (${remaining.toLocaleString()})` : `$${preset.toLocaleString()}`}
+                    <method.icon className="h-5 w-5 mr-2" />
+                    {method.label}
                   </Button>
                 ))}
               </div>
@@ -817,24 +547,14 @@ function VentasContent() {
 
             {payments.length > 0 && (
               <div className="space-y-2">
-                <Label>Pagos Agregados</Label>
-                {payments.map((payment, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-muted rounded"
-                    data-testid={`payment-${index}`}
-                  >
-                    <span className="capitalize">{payment.method}</span>
+                <label className="text-sm font-medium">Pagos registrados:</label>
+                {payments.map((p, i) => (
+                  <div key={i} className="flex items-center justify-between bg-green-50 p-2 rounded">
+                    <span className="capitalize">{p.method}</span>
                     <div className="flex items-center gap-2">
-                      <span>${payment.amount.toLocaleString()}</span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={() => removePayment(index)}
-                        data-testid={`button-remove-payment-${index}`}
-                      >
-                        <X className="h-3 w-3" />
+                      <span className="font-bold">${p.amount.toLocaleString()}</span>
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removePayment(i)}>
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
@@ -842,89 +562,120 @@ function VentasContent() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>Notas (opcional)</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Notas adicionales..."
-                data-testid="input-notes"
-              />
+            <div className="bg-muted p-4 rounded-lg space-y-2">
+              <div className="flex justify-between">
+                <span>Total a cobrar:</span>
+                <span className="font-bold">${finalTotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total pagado:</span>
+                <span className="font-bold">${totalPaid.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-lg">
+                <span>Restante:</span>
+                <span className={`font-bold ${remaining > 0 ? "text-red-500" : "text-green-500"}`}>
+                  ${remaining.toLocaleString()}
+                </span>
+              </div>
             </div>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)} data-testid="button-cancel-payment">
               Cancelar
             </Button>
             <Button
               onClick={processSale}
-              disabled={isProcessing || totalPaid < total}
+              disabled={isProcessing || remaining > 0.01}
+              className="h-12 text-lg px-8"
               data-testid="button-confirm-sale"
             >
-              {isProcessing ? "Procesando..." : "Confirmar Venta"}
-              <Check className="h-4 w-4 ml-2" />
+              {isProcessing ? "Procesando..." : (
+                <>
+                  <Check className="h-5 w-5 mr-2" />
+                  CONFIRMAR VENTA
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showDiscountDialog} onOpenChange={setShowDiscountDialog}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={showSaleDetails} onOpenChange={setShowSaleDetails}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Aplicar Descuento</DialogTitle>
+            <DialogTitle>Detalle de Venta</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Porcentaje de descuento</Label>
-              <Input
-                type="number"
-                value={itemDiscount.percent}
-                onChange={(e) =>
-                  setItemDiscount({ ...itemDiscount, percent: Number(e.target.value), amount: 0 })
-                }
-                placeholder="0"
-                max={100}
-                data-testid="input-item-discount-percent"
-              />
+          {selectedSale && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">No. Venta:</span>
+                  <p className="font-medium">{selectedSale.sale_number}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Fecha:</span>
+                  <p className="font-medium">
+                    {format(new Date(selectedSale.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Productos:</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="text-center">Cant.</TableHead>
+                      <TableHead className="text-right">Subtotal</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedSale.items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.product_name}</TableCell>
+                        <TableCell className="text-center">{item.quantity}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.subtotal)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(selectedSale.subtotal)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total Cobrado:</span>
+                  <span>{formatCurrency(selectedSale.total)}</span>
+                </div>
+                <div className="flex justify-between text-green-600 font-medium">
+                  <span>Ganancia:</span>
+                  <span>{formatCurrency(selectedSale.profit)}</span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Pagos:</h4>
+                {selectedSale.payments.map((p) => (
+                  <div key={p.id} className="flex justify-between text-sm">
+                    <span className="capitalize">{p.payment_method}</span>
+                    <span>{formatCurrency(p.amount)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="text-center text-muted-foreground">o</div>
-            <div className="space-y-2">
-              <Label>Monto de descuento</Label>
-              <Input
-                type="number"
-                value={itemDiscount.amount}
-                onChange={(e) =>
-                  setItemDiscount({ ...itemDiscount, amount: Number(e.target.value), percent: 0 })
-                }
-                placeholder="0"
-                data-testid="input-item-discount-amount"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Motivo del descuento</Label>
-              <Input
-                value={itemDiscount.reason}
-                onChange={(e) => setItemDiscount({ ...itemDiscount, reason: e.target.value })}
-                placeholder="Motivo..."
-                data-testid="input-item-discount-reason"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDiscountDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={applyItemDiscount} data-testid="button-apply-discount">
-              Aplicar
-            </Button>
-          </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>
   );
 }
 
-export default function Ventas() {
+export default function VentasPage() {
   return (
     <RequireOpening>
       <VentasContent />

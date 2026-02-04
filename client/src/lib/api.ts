@@ -636,11 +636,9 @@ export interface Sale {
   user_id: number;
   sale_number: string;
   subtotal: number;
-  tax_total: number;
-  discount_total: number;
-  global_discount: number;
-  global_discount_reason: string | null;
   total: number;
+  cost_total: number;
+  profit: number;
   status: string;
   notes: string | null;
   created_at: string;
@@ -652,12 +650,7 @@ export interface SaleItemCreate {
   product_id?: number;
   product_name: string;
   quantity: number;
-  original_price: number;
-  final_price: number;
-  discount_amount?: number;
-  discount_percent?: number;
-  discount_reason?: string;
-  has_iva?: boolean;
+  unit_price: number;
 }
 
 export interface PaymentCreate {
@@ -670,8 +663,7 @@ export interface SaleCreate {
   store_id: number;
   items: SaleItemCreate[];
   payments: PaymentCreate[];
-  global_discount?: number;
-  global_discount_reason?: string;
+  total_to_charge: number;
   notes?: string;
 }
 

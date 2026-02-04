@@ -347,6 +347,12 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
     
     require_open_cash_register(db, current_user.id, sale_data.store_id, "venta")
     
+    if sale_data.total_to_charge <= 0:
+        raise HTTPException(status_code=400, detail="El total a cobrar debe ser mayor a cero")
+    
+    if len(sale_data.items) == 0:
+        raise HTTPException(status_code=400, detail="La venta debe tener al menos un producto")
+    
     today = datetime.now()
     
     try:
@@ -359,6 +365,7 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
         
         store_code = store.code or f"T{store.id}"
         sale_number = f"{store_code}-{today.strftime('%Y%m%d')}-{sequence_num:06d}"
+        
         products_to_update = {}
         for item_data in sale_data.items:
             if item_data.product_id:
@@ -380,19 +387,16 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
                     )
                 
                 if item_data.product_id not in products_to_update:
-                    products_to_update[item_data.product_id] = {'product': product, 'pending': 0}
+                    products_to_update[item_data.product_id] = {'product': product, 'pending': 0, 'cost': product.cost or 0}
                 products_to_update[item_data.product_id]['pending'] = total_requested
         
         subtotal = Decimal('0')
-        tax_total = Decimal('0')
-        discount_total = Decimal('0')
+        cost_total = Decimal('0')
         
         sale = Sale(
             store_id=sale_data.store_id,
             user_id=current_user.id,
             sale_number=sale_number,
-            global_discount=Decimal(str(sale_data.global_discount)),
-            global_discount_reason=sale_data.global_discount_reason,
             notes=sale_data.notes
         )
         db.add(sale)
@@ -401,29 +405,23 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
         stock_movements = []
         
         for item_data in sale_data.items:
-            item_subtotal = Decimal(str(item_data.final_price)) * item_data.quantity
-            iva_amount = Decimal('0')
-            if item_data.has_iva:
-                iva_amount = item_subtotal * Decimal('0.19')
-                tax_total += iva_amount
-            
-            item_discount = (Decimal(str(item_data.original_price)) - Decimal(str(item_data.final_price))) * item_data.quantity
-            discount_total += item_discount
+            item_subtotal = Decimal(str(item_data.unit_price)) * item_data.quantity
             subtotal += item_subtotal
+            
+            item_cost = Decimal('0')
+            if item_data.product_id and item_data.product_id in products_to_update:
+                item_cost = Decimal(str(products_to_update[item_data.product_id]['cost']))
+            cost_total += item_cost * item_data.quantity
             
             sale_item = SaleItem(
                 sale_id=sale.id,
                 product_id=item_data.product_id,
                 product_name=item_data.product_name,
                 quantity=item_data.quantity,
-                original_price=Decimal(str(item_data.original_price)),
-                final_price=Decimal(str(item_data.final_price)),
-                discount_amount=Decimal(str(item_data.discount_amount)),
-                discount_percent=Decimal(str(item_data.discount_percent)),
-                discount_reason=item_data.discount_reason,
-                has_iva=item_data.has_iva,
-                iva_amount=iva_amount,
-                subtotal=item_subtotal + iva_amount
+                original_price=Decimal(str(item_data.unit_price)),
+                final_price=Decimal(str(item_data.unit_price)),
+                cost_base=item_cost,
+                subtotal=item_subtotal
             )
             db.add(sale_item)
             
@@ -447,19 +445,18 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
         for movement in stock_movements:
             db.add(movement)
         
-        total = subtotal - Decimal(str(sale_data.global_discount))
+        total_to_charge = Decimal(str(sale_data.total_to_charge))
+        profit = total_to_charge - cost_total
+        
         sale.subtotal = subtotal
-        sale.tax_total = tax_total
-        sale.discount_total = discount_total
-        sale.total = total
+        sale.total = total_to_charge
+        sale.cost_total = cost_total
+        sale.profit = profit
         
         total_payments = sum(Decimal(str(p.amount)) for p in sale_data.payments)
         
-        if total_payments < total:
-            raise HTTPException(status_code=400, detail="El pago no cubre el total de la venta")
-        
-        if total_payments > total:
-            raise HTTPException(status_code=400, detail=f"El pago (${total_payments}) excede el total de la venta (${total})")
+        if abs(total_payments - total_to_charge) > Decimal('0.01'):
+            raise HTTPException(status_code=400, detail=f"Los pagos (${total_payments}) no coinciden con el total a cobrar (${total_to_charge})")
         
         for payment_data in sale_data.payments:
             payment = Payment(
@@ -479,7 +476,7 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
             action="create_sale",
             entity_type="sale",
             entity_id=sale.id,
-            new_values=f"Sale {sale_number} - Total: ${total}"
+            new_values=f"Venta {sale_number} - Cobrado: ${total_to_charge} - Costo: ${cost_total} - Ganancia: ${profit}"
         )
         db.add(audit)
         

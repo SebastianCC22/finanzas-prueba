@@ -1,0 +1,211 @@
+Estoy desarrollando un POS para una tienda naturista con dos sedes (“Tunal” y “20 de Julio”).
+El sistema actual es demasiado complejo para la realidad del negocio.
+Necesito simplificar radicalmente el flujo de ventas, manteniendo exactitud contable y cálculo correcto de ganancias, sin fricción al vender.
+
+OBJETIVO PRINCIPAL
+
+👉 Vender rápido, como en la vida real
+👉 Aplicar descuentos directos al total, sin cálculos manuales
+👉 Aceptar pagos mixtos (Nequi + efectivo, etc.)
+👉 Al final del día ver:
+
+Total vendido
+
+Costo real de productos
+
+Ganancia neta real
+
+Nada más. Sin enredos.
+
+CAMBIOS CLAVE DE CONCEPTO (IMPORTANTES)
+❌ ELIMINAR
+
+Descuentos por producto
+
+Porcentajes de descuento
+
+Razones obligatorias de descuento
+
+IVA mostrado como algo que el cajero tenga que pensar
+
+✅ SIMPLIFICAR A:
+
+Un solo descuento opcional al TOTAL
+
+El total final es lo que el cliente paga, punto.
+
+Ejemplo real:
+
+El sistema calcula 50.000
+El cajero escribe: 45.000
+Ese es el total final. No preguntas más.
+
+NUEVO FLUJO DE VENTA (REALISTA)
+1. BÚSQUEDA DE PRODUCTOS (OBLIGATORIO)
+
+Al entrar al POS:
+
+Input de búsqueda visible inmediatamente
+
+Buscar por:
+
+Nombre
+
+Marca
+
+Código
+
+Resultados instantáneos (máx. 10)
+
+Teclado primero, mouse opcional
+
+⚡ Nada de filtros ocultos
+
+2. CARRITO
+
+Click o Enter para agregar producto
+
+Cantidad editable con teclado
+
+Se muestra:
+
+Nombre
+
+Precio venta
+
+Cantidad
+
+Subtotal por producto
+
+👉 El sistema internamente guarda el costo base, pero NO lo muestra al cajero.
+
+3. TOTAL SIMPLE
+
+El sistema muestra:
+
+Total calculado automáticamente (solo informativo)
+
+Campo editable grande:
+👉 “TOTAL A COBRAR”
+
+Ejemplo:
+
+Total calculado: $50.000
+Total a cobrar: [ 45.000 ]
+
+
+Si el cajero cambia el valor:
+
+Se guarda como total_final
+
+El descuento es implícito (no se calcula ni se muestra)
+
+4. PAGOS MIXTOS (OBLIGATORIO Y SIMPLE)
+
+Pantalla de pago:
+
+Botones grandes:
+
+Efectivo
+
+Nequi
+
+Daviplata
+
+Bold
+
+Flujo:
+
+Selecciona método
+
+Ingresa monto
+
+Puede agregar varios pagos
+
+El sistema valida que:
+
+La suma de pagos = total a cobrar
+
+Ejemplo válido:
+
+Nequi: 25.000
+
+Efectivo: 20.000
+✅ Total: 45.000
+
+5. CIERRE DE VENTA (AUTOMÁTICO)
+
+Al confirmar:
+
+Se crea la venta
+
+Se descuentan productos del inventario
+
+Se registran pagos
+
+Se actualiza caja
+
+Se registra auditoría
+
+El carrito se limpia
+
+⏱ Todo en 1 clic final
+
+CÁLCULO DE GANANCIA (CLAVE DEL SISTEMA)
+Lógica interna (NO visible al cajero):
+
+Para cada venta:
+
+costo_total = suma(costos_base × cantidad)
+
+ganancia = total_final - costo_total
+
+👉 La ganancia NO depende del precio original, sino de:
+
+lo que realmente se cobró menos lo que realmente costó
+
+DASHBOARD / REPORTES (CLAROS)
+
+Mostrar:
+
+Ventas del día
+
+Total cobrado
+
+Costo de productos vendidos
+
+Ganancia neta real
+
+Pagos por método (efectivo, nequi, etc.)
+
+Nada más.
+
+PERMISOS
+
+Cajero:
+
+Vender
+
+Aplicar descuento directo
+
+Admin:
+
+Ver ganancias
+
+Reportes
+
+Auditoría
+
+RESULTADO FINAL ESPERADO
+
+Un POS que:
+
+Se usa sin pensar
+
+No frena la venta
+
+No descuadra dinero
+
+Muestra ganancias reales
+
+Funciona igual que vender en el mostrador
