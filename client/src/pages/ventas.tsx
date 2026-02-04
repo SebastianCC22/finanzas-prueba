@@ -118,18 +118,27 @@ function VentasContent() {
   };
 
   const filteredProducts = useMemo(() => {
-    if (!searchTerm) return [];
-    const term = searchTerm.toLowerCase();
-    let filtered = products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(term) ||
-        p.brand?.toLowerCase().includes(term) ||
-        p.supplier?.toLowerCase().includes(term)
-    );
+    let filtered = products;
+    
     if (selectedSupplier !== "all") {
       filtered = filtered.filter(p => p.supplier === selectedSupplier);
     }
-    return filtered.slice(0, 10);
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(term) ||
+          p.brand?.toLowerCase().includes(term) ||
+          p.supplier?.toLowerCase().includes(term)
+      );
+    }
+    
+    if (!searchTerm && selectedSupplier === "all") {
+      return [];
+    }
+    
+    return filtered.slice(0, 15);
   }, [products, searchTerm, selectedSupplier]);
 
   const addToCart = (product: Product) => {
