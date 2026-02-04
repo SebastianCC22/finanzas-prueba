@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "@/lib/authStore";
 import { api, Supplier, SupplierCreate, SupplierInvoice, SupplierInvoiceCreate, SupplierInvoiceSummary, InvoicePaymentCreate } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 import { 
   Plus, Search, Building2, FileText, AlertTriangle, 
   DollarSign, Calendar, CreditCard, Eye, Trash2, 
-  Clock, CheckCircle, XCircle, AlertCircle, Download
+  Clock, CheckCircle, XCircle, AlertCircle, Download,
+  Paperclip, Upload, File, Image, Loader2
 } from "lucide-react";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -83,6 +84,9 @@ export default function Proveedores() {
     reference: "",
     notes: "",
   });
+  
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -190,6 +194,75 @@ export default function Proveedores() {
     try {
       await api.deleteSupplierInvoice(id);
       toast({ title: "Factura eliminada" });
+      loadData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedInvoice || !e.target.files?.[0]) return;
+    
+    const file = e.target.files[0];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    
+    if (!allowedTypes.includes(file.type)) {
+      toast({ 
+        title: "Tipo de archivo no permitido", 
+        description: "Solo se permiten archivos JPG, PNG, GIF o PDF",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    if (file.size > maxSize) {
+      toast({ 
+        title: "Archivo muy grande", 
+        description: "El tamaño máximo es 5MB",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    setIsUploading(true);
+    try {
+      await api.uploadInvoiceFile(selectedInvoice.id, file);
+      toast({ title: "Archivo subido exitosamente" });
+      loadData();
+      const updatedInvoice = invoices.find(i => i.id === selectedInvoice.id);
+      if (updatedInvoice) {
+        setSelectedInvoice({ ...selectedInvoice, has_file: true, invoice_file_name: file.name });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleViewFile = async () => {
+    if (!selectedInvoice) return;
+    try {
+      const blob = await api.downloadInvoiceFile(selectedInvoice.id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteFile = async () => {
+    if (!selectedInvoice) return;
+    if (!confirm("¿Está seguro de eliminar el archivo adjunto?")) return;
+    
+    try {
+      await api.deleteInvoiceFile(selectedInvoice.id);
+      toast({ title: "Archivo eliminado" });
+      setSelectedInvoice({ ...selectedInvoice, has_file: false, invoice_file_name: undefined });
       loadData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -509,6 +582,11 @@ export default function Proveedores() {
                             <FileText className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium">{invoice.invoice_number}</span>
                             {getStatusBadge(invoice.status)}
+                            {invoice.has_file && (
+                              <span title="Tiene archivo adjunto">
+                                <Paperclip className="h-3 w-3 text-green-500" />
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">{invoice.supplier_name}</p>
                           <p className={cn("text-xs", dueInfo.color)}>{dueInfo.text}</p>
@@ -757,6 +835,74 @@ export default function Proveedores() {
                   <p>{selectedInvoice.notes}</p>
                 </div>
               )}
+              
+              <div className="border-t pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Paperclip className="h-4 w-4" />
+                  <p className="font-medium">Factura Adjunta</p>
+                </div>
+                
+                {selectedInvoice.has_file ? (
+                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      {selectedInvoice.invoice_file_name?.endsWith('.pdf') ? (
+                        <File className="h-5 w-5 text-red-500" />
+                      ) : (
+                        <Image className="h-5 w-5 text-blue-500" />
+                      )}
+                      <span className="text-sm truncate max-w-[200px]">
+                        {selectedInvoice.invoice_file_name || "Archivo adjunto"}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={handleViewFile} data-testid="button-view-file">
+                        <Eye className="h-4 w-4 mr-1" />
+                        Ver
+                      </Button>
+                      {user?.role === 'admin' && (
+                        <Button variant="ghost" size="sm" onClick={handleDeleteFile} className="text-red-500 hover:text-red-600" data-testid="button-delete-file">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 border-2 border-dashed rounded-lg text-center">
+                    {user?.role === 'admin' ? (
+                      <>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileUpload}
+                          accept=".jpg,.jpeg,.png,.gif,.pdf"
+                          className="hidden"
+                        />
+                        <Button 
+                          variant="outline" 
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploading}
+                          data-testid="button-upload-file"
+                        >
+                          {isUploading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Subiendo...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Subir factura
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-2">JPG, PNG, GIF o PDF (máx. 5MB)</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sin archivo adjunto</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

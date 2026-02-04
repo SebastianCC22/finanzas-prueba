@@ -112,9 +112,9 @@ class ApiClient {
     const params = new URLSearchParams();
     if (storeId) params.append('store_id', storeId.toString());
     
-    const response = await fetch(`${this.baseUrl}/inventory/export?${params}`, {
+    const response = await fetch(`${API_BASE}/inventory/export?${params}`, {
       headers: {
-        'Authorization': `Bearer ${this.token}`,
+        'Authorization': `Bearer ${this.getToken()}`,
       },
     });
     
@@ -380,6 +380,51 @@ class ApiClient {
 
   async getInvoiceSummary() {
     return this.request<SupplierInvoiceSummary>('/supplier-invoices/summary');
+  }
+
+  async uploadInvoiceFile(invoiceId: number, file: File): Promise<{ message: string; file_name: string; file_url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${API_BASE}/supplier-invoices/${invoiceId}/upload-file`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.getToken()}`,
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Error al subir archivo' }));
+      throw new Error(error.detail || 'Error al subir archivo');
+    }
+    
+    return response.json();
+  }
+
+  getInvoiceFileUrl(invoiceId: number): string {
+    return `${API_BASE}/supplier-invoices/${invoiceId}/file`;
+  }
+
+  async downloadInvoiceFile(invoiceId: number): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/supplier-invoices/${invoiceId}/file`, {
+      headers: {
+        'Authorization': `Bearer ${this.getToken()}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Error al descargar archivo' }));
+      throw new Error(error.detail || 'Error al descargar archivo');
+    }
+    
+    return response.blob();
+  }
+
+  async deleteInvoiceFile(invoiceId: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/supplier-invoices/${invoiceId}/file`, {
+      method: 'DELETE',
+    });
   }
 }
 
@@ -844,6 +889,9 @@ export interface SupplierInvoice {
   payment_type: string;
   status: string;
   image_url?: string;
+  invoice_file_url?: string;
+  invoice_file_name?: string;
+  has_file: boolean;
   notes?: string;
   created_at: string;
   updated_at: string;
