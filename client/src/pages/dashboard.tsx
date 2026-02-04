@@ -268,8 +268,8 @@ export default function Dashboard() {
           </div>
         </>
       ) : (
-        <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto mt-8">
-          <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden">
+        <div className="flex flex-col md:flex-row gap-8 justify-center items-center mt-12">
+          <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden w-full md:w-80">
             <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 p-8 text-white">
               <div className="flex items-center justify-between mb-6">
                 <span className="text-emerald-100 text-sm font-medium uppercase tracking-widest">
@@ -289,7 +289,7 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden">
+          <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden w-full md:w-80">
             <div className="bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 p-8 text-white">
               <div className="flex items-center justify-between mb-6">
                 <span className="text-slate-300 text-sm font-medium uppercase tracking-widest">
