@@ -7,9 +7,12 @@ import { spawn } from "child_process";
 const app = express();
 const httpServer = createServer(app);
 
-const backendProcess = spawn("python", ["-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"], {
+const backendEnv = Object.assign({}, process.env, { PYTHONDONTWRITEBYTECODE: "1" });
+console.log("DEBUG: 20J_SELLER_PASSWORD in backendEnv:", backendEnv["20J_SELLER_PASSWORD"]?.length || 0);
+const backendProcess = spawn("python", ["-B", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"], {
   stdio: ["inherit", "inherit", "inherit"],
-  detached: false
+  detached: false,
+  env: backendEnv
 });
 
 backendProcess.on("error", (err) => {

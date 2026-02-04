@@ -87,3 +87,33 @@ def require_seller_or_admin(current_user: User = Depends(get_current_user)) -> U
 def require_viewer_or_above(current_user: User = Depends(get_current_user)) -> User:
     """Cualquier usuario autenticado (ADMIN, SELLER, VIEWER) - solo lectura para VIEWER"""
     return current_user
+
+def get_effective_store_id(current_user: User, requested_store_id: int = None) -> int:
+    """
+    Obtiene el store_id efectivo para un usuario.
+    - Para sellers: siempre usa su store_id asignado (ignora requested_store_id)
+    - Para admins: usa requested_store_id si se proporciona, de lo contrario None
+    """
+    if current_user.role == "seller":
+        if current_user.store_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="El vendedor no tiene tienda asignada"
+            )
+        return current_user.store_id
+    return requested_store_id
+
+def validate_store_access(current_user: User, store_id: int) -> bool:
+    """
+    Valida que el usuario tenga acceso a la tienda especificada.
+    - Admins: acceso a todas las tiendas
+    - Sellers: solo a su tienda asignada
+    """
+    if current_user.role == "admin":
+        return True
+    if current_user.role == "seller" and current_user.store_id == store_id:
+        return True
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="No tienes acceso a esta tienda"
+    )

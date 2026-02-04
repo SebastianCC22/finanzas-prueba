@@ -38,7 +38,8 @@ from backend.api.schemas import (
 from backend.services.backup_service import create_backup, get_latest_backup, get_all_backups
 from backend.services.auth import (
     get_password_hash, verify_password, create_access_token,
-    get_current_user, require_admin, require_seller_or_admin, require_viewer_or_above
+    get_current_user, require_admin, require_seller_or_admin, require_viewer_or_above,
+    get_effective_store_id, validate_store_access
 )
 from backend.services.export import (
     export_to_excel, export_to_pdf,
@@ -275,6 +276,11 @@ def get_product_movements(product_id: int, db: Session = Depends(get_db)):
 
 @router.post("/sales", response_model=SaleResponse)
 def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_user: User = Depends(require_seller_or_admin)):
+    effective_store_id = get_effective_store_id(current_user, sale_data.store_id)
+    if effective_store_id:
+        validate_store_access(current_user, effective_store_id)
+        sale_data.store_id = effective_store_id
+    
     today = datetime.now()
     opening = db.query(CashOpening).filter(
         CashOpening.store_id == sale_data.store_id,
@@ -472,6 +478,8 @@ def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), curr
     sale = db.query(Sale).filter(Sale.id == return_data.sale_id, Sale.deleted_at == None).first()
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada o eliminada")
+    
+    validate_store_access(current_user, sale.store_id)
     
     try:
         return_record = Return(
@@ -736,6 +744,11 @@ def get_product_transfers(
 
 @router.post("/expenses", response_model=ExpenseResponse)
 def create_expense(expense_data: ExpenseCreate, db: Session = Depends(get_db), current_user: User = Depends(require_seller_or_admin)):
+    effective_store_id = get_effective_store_id(current_user, expense_data.store_id)
+    if effective_store_id:
+        validate_store_access(current_user, effective_store_id)
+        expense_data.store_id = effective_store_id
+    
     register = db.query(CashRegister).filter(CashRegister.id == expense_data.cash_register_id).with_for_update().first()
     if not register:
         raise HTTPException(status_code=404, detail="Caja no encontrada")
@@ -878,6 +891,11 @@ def create_cash_opening(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_seller_or_admin)
 ):
+    effective_store_id = get_effective_store_id(current_user, opening_data.store_id)
+    if effective_store_id:
+        validate_store_access(current_user, effective_store_id)
+        opening_data.store_id = effective_store_id
+    
     today = datetime.now().date()
     existing = db.query(CashOpening).filter(
         CashOpening.store_id == opening_data.store_id,

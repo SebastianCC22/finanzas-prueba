@@ -42,6 +42,24 @@ def validate_environment():
     if admin_pwd and admin_pwd in ["CHANGE_ME_IN_PRODUCTION", "admin", "password", "123456"]:
         logger.warning("ADMIN_DEFAULT_PASSWORD tiene un valor inseguro. Cambie en producción.")
     
+    blocked_passwords = ["CHANGE_ME_IN_PRODUCTION", ""]
+    weak_passwords = ["1234", "password", "123456", "admin"]
+    
+    tunal_pwd = os.environ.get("TUNAL_SELLER_PASSWORD", "")
+    if tunal_pwd in blocked_passwords:
+        logger.critical("TUNAL_SELLER_PASSWORD no está configurada o tiene valor por defecto.")
+        sys.exit(1)
+    if tunal_pwd in weak_passwords:
+        logger.warning("TUNAL_SELLER_PASSWORD tiene un valor débil. Considere cambiarlo.")
+    
+    seller_20j_pwd = os.environ.get("20J_SELLER_PASSWORD", "")
+    logger.info(f"DEBUG: 20J_SELLER_PASSWORD length={len(seller_20j_pwd)}, blocked={blocked_passwords}, in_blocked={seller_20j_pwd in blocked_passwords}")
+    if seller_20j_pwd in blocked_passwords:
+        logger.critical("20J_SELLER_PASSWORD no está configurada o tiene valor por defecto.")
+        sys.exit(1)
+    if seller_20j_pwd in weak_passwords:
+        logger.warning("20J_SELLER_PASSWORD tiene un valor débil. Considere cambiarlo.")
+    
     logger.info("Validación de configuración completada")
 
 def get_config(key: str, default: str = None) -> str:

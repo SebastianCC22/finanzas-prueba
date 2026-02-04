@@ -83,8 +83,19 @@ export const useAuthStore = create<AuthState>()(
           set({ stores });
           
           const { currentStore } = get();
-          if (!currentStore && stores.length > 0) {
-            set({ currentStore: stores[0] });
+          
+          if (user.store_id) {
+            const userStore = stores.find(s => s.id === user.store_id);
+            if (userStore) {
+              set({ currentStore: userStore });
+            }
+          } else if (user.role === 'admin') {
+            if (currentStore) {
+              const validStore = stores.find(s => s.id === currentStore.id);
+              if (!validStore) {
+                set({ currentStore: null });
+              }
+            }
           }
           
           return true;
