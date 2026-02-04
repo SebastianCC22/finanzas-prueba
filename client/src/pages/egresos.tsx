@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { DollarSign, Plus, History, Download } from "lucide-react";
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
+import { RequireOpening } from "@/components/require-opening";
 
 const PAYMENT_METHODS = [
   { id: "efectivo", label: "Efectivo" },
@@ -21,7 +22,7 @@ const PAYMENT_METHODS = [
   { id: "daviplata", label: "Daviplata" },
 ];
 
-export default function Egresos() {
+function EgresosContent() {
   const { currentStore } = useAuthStore();
   const { toast } = useToast();
 
@@ -250,5 +251,13 @@ export default function Egresos() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function Egresos() {
+  return (
+    <RequireOpening>
+      <EgresosContent />
+    </RequireOpening>
   );
 }

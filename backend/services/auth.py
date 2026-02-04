@@ -115,3 +115,54 @@ def validate_store_access(current_user: User, store_id: int) -> bool:
         status_code=status.HTTP_403_FORBIDDEN,
         detail="No tienes acceso a esta tienda"
     )
+
+def get_open_cash_register(db: Session, user_id: int, store_id: int):
+    """
+    Verifica si existe una caja abierta (apertura sin cierre) para la tienda del día actual.
+    Retorna la apertura si existe, None si no.
+    """
+    from backend.models.models import CashOpening, CashClosing, AuditLog
+    from sqlalchemy import func
+    from datetime import datetime
+    
+    today = datetime.now().date()
+    
+    openings = db.query(CashOpening).filter(
+        CashOpening.store_id == store_id,
+        func.date(CashOpening.opening_date) == today
+    ).order_by(CashOpening.opening_date.desc()).all()
+    
+    for opening in openings:
+        has_closing = db.query(CashClosing).filter(CashClosing.opening_id == opening.id).first()
+        if not has_closing:
+            return opening
+    
+    return None
+
+def require_open_cash_register(db: Session, user_id: int, store_id: int, action: str = "operación"):
+    """
+    Valida que exista una caja abierta para operar.
+    Registra intentos sin caja en auditoría.
+    Lanza HTTP 409 si no hay caja abierta.
+    """
+    from backend.models.models import AuditLog
+    
+    opening = get_open_cash_register(db, user_id, store_id)
+    
+    if not opening:
+        audit = AuditLog(
+            user_id=user_id,
+            action="cash_register_required",
+            entity_type="cash_opening",
+            entity_id=0,
+            new_values=f"Intento de {action} sin caja abierta en tienda {store_id}"
+        )
+        db.add(audit)
+        db.commit()
+        
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No hay caja abierta. Debe realizar la apertura de caja para continuar."
+        )
+    
+    return opening

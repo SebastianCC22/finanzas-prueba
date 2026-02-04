@@ -14,8 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Search, RotateCcw, Package, History } from "lucide-react";
 import { format } from "date-fns";
+import { RequireOpening } from "@/components/require-opening";
 
-export default function Devoluciones() {
+function DevolucionesContent() {
   const { currentStore } = useAuthStore();
   const { toast } = useToast();
 
@@ -352,5 +353,13 @@ export default function Devoluciones() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function Devoluciones() {
+  return (
+    <RequireOpening>
+      <DevolucionesContent />
+    </RequireOpening>
   );
 }

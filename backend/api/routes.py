@@ -39,7 +39,7 @@ from backend.services.backup_service import create_backup, get_latest_backup, ge
 from backend.services.auth import (
     get_password_hash, verify_password, create_access_token,
     get_current_user, require_admin, require_seller_or_admin, require_viewer_or_above,
-    get_effective_store_id, validate_store_access
+    get_effective_store_id, validate_store_access, get_open_cash_register, require_open_cash_register
 )
 from backend.services.export import (
     export_to_excel, export_to_pdf,
@@ -281,20 +281,9 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
         validate_store_access(current_user, effective_store_id)
         sale_data.store_id = effective_store_id
     
+    require_open_cash_register(db, current_user.id, sale_data.store_id, "venta")
+    
     today = datetime.now()
-    opening = db.query(CashOpening).filter(
-        CashOpening.store_id == sale_data.store_id,
-        func.date(CashOpening.opening_date) == today.date()
-    ).first()
-    
-    if not opening:
-        raise HTTPException(status_code=400, detail="No hay apertura de caja para hoy. Debe realizar la apertura primero.")
-    
-    existing_closing = db.query(CashClosing).filter(
-        CashClosing.opening_id == opening.id
-    ).first()
-    if existing_closing:
-        raise HTTPException(status_code=400, detail="La caja ya fue cerrada hoy.")
     
     try:
         store = db.query(Store).filter(Store.id == sale_data.store_id).with_for_update().first()
@@ -480,6 +469,7 @@ def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), curr
         raise HTTPException(status_code=404, detail="Venta no encontrada o eliminada")
     
     validate_store_access(current_user, sale.store_id)
+    require_open_cash_register(db, current_user.id, sale.store_id, "devolución")
     
     try:
         return_record = Return(
@@ -748,6 +738,8 @@ def create_expense(expense_data: ExpenseCreate, db: Session = Depends(get_db), c
     if effective_store_id:
         validate_store_access(current_user, effective_store_id)
         expense_data.store_id = effective_store_id
+    
+    require_open_cash_register(db, current_user.id, expense_data.store_id, "gasto")
     
     register = db.query(CashRegister).filter(CashRegister.id == expense_data.cash_register_id).with_for_update().first()
     if not register:

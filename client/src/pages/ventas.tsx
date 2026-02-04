@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, Percent, X, Check, History, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { RequireOpening } from "@/components/require-opening";
 
 interface CartItem extends SaleItemCreate {
   id: string;
@@ -27,7 +28,7 @@ const PAYMENT_METHODS = [
   { id: "daviplata", label: "Daviplata", icon: CreditCard },
 ];
 
-export default function Ventas() {
+function VentasContent() {
   const { currentStore } = useAuthStore();
   const { toast } = useToast();
   
@@ -920,5 +921,13 @@ export default function Ventas() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function Ventas() {
+  return (
+    <RequireOpening>
+      <VentasContent />
+    </RequireOpening>
   );
 }
