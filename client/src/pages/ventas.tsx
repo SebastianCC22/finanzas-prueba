@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, History, Eye, Check } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, History, Eye, Check, Store, TrendingUp, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RequireOpening } from "@/components/require-opening";
@@ -30,7 +31,8 @@ const PAYMENT_METHODS = [
 ];
 
 function VentasContent() {
-  const { currentStore } = useAuthStore();
+  const { currentStore, user } = useAuthStore();
+  const isAdmin = user?.role === "admin";
   const { toast } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   
@@ -49,6 +51,19 @@ function VentasContent() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [showSaleDetails, setShowSaleDetails] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
+
+  const suppliers = useMemo(() => {
+    const supplierSet = new Set(products.map(p => p.supplier).filter(Boolean));
+    return Array.from(supplierSet).sort();
+  }, [products]);
+
+  const topProducts = useMemo(() => {
+    return products
+      .filter(p => p.quantity > 0)
+      .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
+      .slice(0, 8);
+  }, [products]);
 
   useEffect(() => {
     if (currentStore) {
@@ -105,13 +120,17 @@ function VentasContent() {
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return [];
     const term = searchTerm.toLowerCase();
-    return products.filter(
+    let filtered = products.filter(
       (p) =>
         p.name.toLowerCase().includes(term) ||
         p.brand?.toLowerCase().includes(term) ||
         p.supplier?.toLowerCase().includes(term)
-    ).slice(0, 10);
-  }, [products, searchTerm]);
+    );
+    if (selectedSupplier !== "all") {
+      filtered = filtered.filter(p => p.supplier === selectedSupplier);
+    }
+    return filtered.slice(0, 10);
+  }, [products, searchTerm, selectedSupplier]);
 
   const addToCart = (product: Product) => {
     const existingItem = cart.find((item) => item.product_id === product.id);
@@ -275,11 +294,21 @@ function VentasContent() {
   };
 
   return (
-    <div className="container mx-auto p-4 space-y-4">
+    <div className={`${!isAdmin ? 'min-h-screen -m-4 md:-m-8 bg-slate-950' : 'container mx-auto'} p-4 space-y-4`}>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">
-          Ventas - {currentStore?.name}
-        </h1>
+        <div>
+          {!isAdmin && (
+            <div className="flex items-center gap-2 text-emerald-400 mb-1">
+              <Store className="h-4 w-4" />
+              <span className="text-sm font-semibold uppercase tracking-wider">
+                {currentStore?.name}
+              </span>
+            </div>
+          )}
+          <h1 className={`text-2xl font-bold ${!isAdmin ? 'text-white' : ''}`} data-testid="text-page-title">
+            {isAdmin ? `Ventas - ${currentStore?.name}` : 'Punto de Venta'}
+          </h1>
+        </div>
         {!hasOpening && (
           <Badge variant="destructive" data-testid="badge-no-opening">
             Apertura de caja pendiente
@@ -287,13 +316,38 @@ function VentasContent() {
         )}
       </div>
 
+      {topProducts.length > 0 && (
+        <div className={`${!isAdmin ? 'bg-slate-900/50 border border-slate-800' : 'bg-muted/50 border'} rounded-xl p-4`}>
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className={`h-4 w-4 ${!isAdmin ? 'text-emerald-400' : 'text-primary'}`} />
+            <span className={`text-sm font-medium ${!isAdmin ? 'text-slate-300' : ''}`}>Productos destacados</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {topProducts.map((product) => (
+              <button
+                key={product.id}
+                onClick={() => addToCart(product)}
+                className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  !isAdmin 
+                    ? 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700' 
+                    : 'bg-background hover:bg-accent border'
+                }`}
+                data-testid={`quick-product-${product.id}`}
+              >
+                {product.name.length > 20 ? product.name.substring(0, 20) + '...' : product.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="pos" className="flex items-center gap-2" data-testid="tab-pos">
+        <TabsList className={`grid w-full max-w-md grid-cols-2 ${!isAdmin ? 'bg-slate-800' : ''}`}>
+          <TabsTrigger value="pos" className={`flex items-center gap-2 ${!isAdmin ? 'data-[state=active]:bg-emerald-600 data-[state=active]:text-white' : ''}`} data-testid="tab-pos">
             <ShoppingCart className="h-4 w-4" />
             Punto de Venta
           </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2" data-testid="tab-history">
+          <TabsTrigger value="history" className={`flex items-center gap-2 ${!isAdmin ? 'data-[state=active]:bg-emerald-600 data-[state=active]:text-white' : ''}`} data-testid="tab-history">
             <History className="h-4 w-4" />
             Historial
           </TabsTrigger>
@@ -302,61 +356,82 @@ function VentasContent() {
         <TabsContent value="pos" className="mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Search className="h-5 w-5" />
-                    Buscar Producto
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Input
-                    ref={searchInputRef}
-                    placeholder="Escriba nombre, marca o código..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="text-lg h-12"
-                    data-testid="input-search-product"
-                    autoFocus
-                  />
+              <div className={`rounded-xl ${!isAdmin ? 'bg-slate-900/50 border border-slate-800' : 'bg-card border'}`}>
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Search className={`h-5 w-5 ${!isAdmin ? 'text-emerald-400' : 'text-primary'}`} />
+                    <span className={`font-semibold ${!isAdmin ? 'text-white' : ''}`}>Buscar Producto</span>
+                  </div>
+                  
+                  <div className="flex gap-2 mb-3">
+                    <Input
+                      ref={searchInputRef}
+                      placeholder="Escriba nombre, marca o código..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`text-lg h-12 flex-1 ${!isAdmin ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : ''}`}
+                      data-testid="input-search-product"
+                      autoFocus
+                    />
+                    <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                      <SelectTrigger className={`w-40 h-12 ${!isAdmin ? 'bg-slate-800 border-slate-700 text-white' : ''}`} data-testid="select-supplier">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Proveedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {suppliers.map((supplier) => (
+                          <SelectItem key={supplier} value={supplier || ''}>
+                            {supplier}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {filteredProducts.length > 0 && (
-                    <div className="mt-2 border rounded-lg max-h-80 overflow-y-auto">
+                    <div className={`border rounded-lg max-h-80 overflow-y-auto ${!isAdmin ? 'border-slate-700' : ''}`}>
                       {filteredProducts.map((product) => (
                         <div
                           key={product.id}
-                          className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                          className={`flex items-center justify-between p-3 cursor-pointer border-b last:border-b-0 ${
+                            !isAdmin 
+                              ? 'hover:bg-slate-800 border-slate-700' 
+                              : 'hover:bg-muted'
+                          }`}
                           onClick={() => addToCart(product)}
                           data-testid={`row-product-${product.id}`}
                         >
                           <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className={`font-medium ${!isAdmin ? 'text-white' : ''}`}>{product.name}</p>
+                            <p className={`text-sm ${!isAdmin ? 'text-slate-400' : 'text-muted-foreground'}`}>
                               {product.brand} • Stock: {product.quantity}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-bold text-lg">${product.sale_price.toLocaleString()}</p>
+                            <p className={`font-bold text-lg ${!isAdmin ? 'text-emerald-400' : ''}`}>${product.sale_price.toLocaleString()}</p>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4">
-              <Card>
-                <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5" />
-                    Carrito
-                  </CardTitle>
-                  <Badge variant="secondary">{cart.length} items</Badge>
-                </CardHeader>
-                <CardContent>
+              <div className={`rounded-xl ${!isAdmin ? 'bg-slate-900/50 border border-slate-800' : 'bg-card border'}`}>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart className={`h-5 w-5 ${!isAdmin ? 'text-emerald-400' : ''}`} />
+                      <span className={`font-semibold ${!isAdmin ? 'text-white' : ''}`}>Carrito</span>
+                    </div>
+                    <Badge variant="secondary" className={!isAdmin ? 'bg-slate-700 text-white' : ''}>{cart.length} items</Badge>
+                  </div>
+                  
                   {cart.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8" data-testid="text-empty-cart">
+                    <p className={`text-center py-8 ${!isAdmin ? 'text-slate-500' : 'text-muted-foreground'}`} data-testid="text-empty-cart">
                       Carrito vacío - Busque un producto arriba
                     </p>
                   ) : (
@@ -364,12 +439,12 @@ function VentasContent() {
                       {cart.map((item) => (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
+                          className={`flex items-center justify-between p-2 rounded-lg ${!isAdmin ? 'bg-slate-800/50' : 'bg-muted/50'}`}
                           data-testid={`cart-item-${item.id}`}
                         >
                           <div className="flex-1">
-                            <p className="font-medium text-sm">{item.product_name}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={`font-medium text-sm ${!isAdmin ? 'text-white' : ''}`}>{item.product_name}</p>
+                            <p className={`text-xs ${!isAdmin ? 'text-slate-400' : 'text-muted-foreground'}`}>
                               ${item.unit_price.toLocaleString()} c/u
                             </p>
                           </div>
@@ -377,7 +452,7 @@ function VentasContent() {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="h-8 w-8"
+                              className={`h-8 w-8 ${!isAdmin ? 'border-slate-600 text-white hover:bg-slate-700' : ''}`}
                               onClick={() => updateQuantity(item.id, item.quantity - 1)}
                               data-testid={`button-decrease-${item.id}`}
                             >
@@ -387,13 +462,13 @@ function VentasContent() {
                               type="number"
                               value={item.quantity}
                               onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 0)}
-                              className="w-14 h-8 text-center"
+                              className={`w-14 h-8 text-center ${!isAdmin ? 'bg-slate-800 border-slate-600 text-white' : ''}`}
                               data-testid={`input-quantity-${item.id}`}
                             />
                             <Button
                               size="icon"
                               variant="outline"
-                              className="h-8 w-8"
+                              className={`h-8 w-8 ${!isAdmin ? 'border-slate-600 text-white hover:bg-slate-700' : ''}`}
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
                               data-testid={`button-increase-${item.id}`}
                             >
@@ -409,7 +484,7 @@ function VentasContent() {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                          <p className="font-bold ml-2 w-24 text-right">
+                          <p className={`font-bold ml-2 w-24 text-right ${!isAdmin ? 'text-white' : ''}`}>
                             ${(item.unit_price * item.quantity).toLocaleString()}
                           </p>
                         </div>
@@ -417,15 +492,15 @@ function VentasContent() {
                     </div>
                   )}
 
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="flex justify-between items-center text-2xl font-bold">
+                  <div className={`mt-4 pt-4 border-t ${!isAdmin ? 'border-slate-700' : ''}`}>
+                    <div className={`flex justify-between items-center text-2xl font-bold ${!isAdmin ? 'text-white' : ''}`}>
                       <span>TOTAL:</span>
-                      <span data-testid="text-total">${calculatedTotal.toLocaleString()}</span>
+                      <span data-testid="text-total" className={!isAdmin ? 'text-emerald-400' : ''}>${calculatedTotal.toLocaleString()}</span>
                     </div>
                   </div>
 
                   <Button
-                    className="w-full mt-4 h-14 text-xl"
+                    className={`w-full mt-4 h-14 text-xl ${!isAdmin ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : ''}`}
                     size="lg"
                     onClick={openPaymentDialog}
                     disabled={cart.length === 0 || !hasOpening}
@@ -434,44 +509,42 @@ function VentasContent() {
                     <CreditCard className="h-6 w-6 mr-2" />
                     COBRAR
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Historial de Ventas de Hoy
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className={`rounded-xl ${!isAdmin ? 'bg-slate-900/50 border border-slate-800' : 'bg-card border'}`}>
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <History className={`h-5 w-5 ${!isAdmin ? 'text-emerald-400' : ''}`} />
+                <span className={`font-semibold ${!isAdmin ? 'text-white' : ''}`}>Historial de Ventas de Hoy</span>
+              </div>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>No. Venta</TableHead>
-                    <TableHead>Hora</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Ganancia</TableHead>
+                  <TableRow className={!isAdmin ? 'border-slate-700' : ''}>
+                    <TableHead className={!isAdmin ? 'text-slate-400' : ''}>No. Venta</TableHead>
+                    <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Hora</TableHead>
+                    <TableHead className={`text-right ${!isAdmin ? 'text-slate-400' : ''}`}>Total</TableHead>
+                    <TableHead className={`text-right ${!isAdmin ? 'text-slate-400' : ''}`}>Ganancia</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {salesHistory.map((sale) => (
-                    <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
-                      <TableCell className="font-medium">{sale.sale_number}</TableCell>
-                      <TableCell>{format(new Date(sale.created_at), "HH:mm", { locale: es })}</TableCell>
-                      <TableCell className="text-right font-bold">
+                    <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
+                      <TableCell className={`font-medium ${!isAdmin ? 'text-white' : ''}`}>{sale.sale_number}</TableCell>
+                      <TableCell className={!isAdmin ? 'text-slate-300' : ''}>{format(new Date(sale.created_at), "HH:mm", { locale: es })}</TableCell>
+                      <TableCell className={`text-right font-bold ${!isAdmin ? 'text-white' : ''}`}>
                         {formatCurrency(sale.total)}
                       </TableCell>
-                      <TableCell className="text-right text-green-600 font-medium">
+                      <TableCell className="text-right text-green-500 font-medium">
                         {formatCurrency(sale.profit)}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="ghost" onClick={() => viewSaleDetails(sale)}>
+                        <Button size="sm" variant="ghost" onClick={() => viewSaleDetails(sale)} className={!isAdmin ? 'text-slate-400 hover:text-white' : ''}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -479,53 +552,53 @@ function VentasContent() {
                   ))}
                   {salesHistory.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={5} className={`text-center py-8 ${!isAdmin ? 'text-slate-500' : 'text-muted-foreground'}`}>
                         No hay ventas registradas hoy
                       </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className={`max-w-lg ${!isAdmin ? 'bg-slate-900 border-slate-700 text-white' : ''}`}>
           <DialogHeader>
-            <DialogTitle className="text-xl">Procesar Pago</DialogTitle>
+            <DialogTitle className={`text-xl ${!isAdmin ? 'text-white' : ''}`}>Procesar Pago</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <label className="text-sm text-muted-foreground">Total calculado</label>
-              <p className="text-lg">${calculatedTotal.toLocaleString()}</p>
+            <div className={`p-4 rounded-lg ${!isAdmin ? 'bg-slate-800' : 'bg-muted'}`}>
+              <label className={`text-sm ${!isAdmin ? 'text-slate-400' : 'text-muted-foreground'}`}>Total calculado</label>
+              <p className={`text-lg ${!isAdmin ? 'text-white' : ''}`}>${calculatedTotal.toLocaleString()}</p>
             </div>
 
             <div>
-              <label className="text-sm font-medium">TOTAL A COBRAR</label>
+              <label className={`text-sm font-medium ${!isAdmin ? 'text-white' : ''}`}>TOTAL A COBRAR</label>
               <Input
                 type="number"
                 value={totalToCharge}
                 onChange={(e) => setTotalToCharge(e.target.value)}
-                className="text-2xl h-14 font-bold text-center"
+                className={`text-2xl h-14 font-bold text-center ${!isAdmin ? 'bg-slate-800 border-slate-600 text-white' : ''}`}
                 placeholder={calculatedTotal.toString()}
                 data-testid="input-total-to-charge"
               />
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className={`text-xs mt-1 ${!isAdmin ? 'text-slate-400' : 'text-muted-foreground'}`}>
                 Escriba el monto final que cobrará al cliente
               </p>
             </div>
 
-            <div className="border-t pt-4">
+            <div className={`border-t pt-4 ${!isAdmin ? 'border-slate-700' : ''}`}>
               <div className="flex items-center gap-2 mb-3">
                 <Input
                   type="number"
                   placeholder="Monto"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="flex-1"
+                  className={`flex-1 ${!isAdmin ? 'bg-slate-800 border-slate-600 text-white placeholder:text-slate-500' : ''}`}
                   data-testid="input-payment-amount"
                 />
               </div>
@@ -534,7 +607,7 @@ function VentasContent() {
                   <Button
                     key={method.id}
                     variant="outline"
-                    className="h-14 text-lg"
+                    className={`h-14 text-lg ${!isAdmin ? 'border-slate-600 text-white hover:bg-slate-700' : ''}`}
                     onClick={() => addPayment(method.id)}
                     data-testid={`button-method-${method.id}`}
                   >
@@ -547,13 +620,13 @@ function VentasContent() {
 
             {payments.length > 0 && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Pagos registrados:</label>
+                <label className={`text-sm font-medium ${!isAdmin ? 'text-white' : ''}`}>Pagos registrados:</label>
                 {payments.map((p, i) => (
-                  <div key={i} className="flex items-center justify-between bg-green-50 p-2 rounded">
-                    <span className="capitalize">{p.method}</span>
+                  <div key={i} className={`flex items-center justify-between p-2 rounded ${!isAdmin ? 'bg-emerald-900/30 border border-emerald-700' : 'bg-green-50'}`}>
+                    <span className={`capitalize ${!isAdmin ? 'text-emerald-300' : ''}`}>{p.method}</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold">${p.amount.toLocaleString()}</span>
-                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removePayment(i)}>
+                      <span className={`font-bold ${!isAdmin ? 'text-white' : ''}`}>${p.amount.toLocaleString()}</span>
+                      <Button size="icon" variant="ghost" className={`h-6 w-6 ${!isAdmin ? 'text-slate-400 hover:text-white' : ''}`} onClick={() => removePayment(i)}>
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
@@ -562,17 +635,17 @@ function VentasContent() {
               </div>
             )}
 
-            <div className="bg-muted p-4 rounded-lg space-y-2">
-              <div className="flex justify-between">
+            <div className={`p-4 rounded-lg space-y-2 ${!isAdmin ? 'bg-slate-800' : 'bg-muted'}`}>
+              <div className={`flex justify-between ${!isAdmin ? 'text-slate-300' : ''}`}>
                 <span>Total a cobrar:</span>
-                <span className="font-bold">${finalTotal.toLocaleString()}</span>
+                <span className={`font-bold ${!isAdmin ? 'text-white' : ''}`}>${finalTotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between">
+              <div className={`flex justify-between ${!isAdmin ? 'text-slate-300' : ''}`}>
                 <span>Total pagado:</span>
-                <span className="font-bold">${totalPaid.toLocaleString()}</span>
+                <span className={`font-bold ${!isAdmin ? 'text-white' : ''}`}>${totalPaid.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-lg">
-                <span>Restante:</span>
+                <span className={!isAdmin ? 'text-slate-300' : ''}>Restante:</span>
                 <span className={`font-bold ${remaining > 0 ? "text-red-500" : "text-green-500"}`}>
                   ${remaining.toLocaleString()}
                 </span>
@@ -581,13 +654,13 @@ function VentasContent() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)} data-testid="button-cancel-payment">
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)} data-testid="button-cancel-payment" className={!isAdmin ? 'border-slate-600 text-white hover:bg-slate-700' : ''}>
               Cancelar
             </Button>
             <Button
               onClick={processSale}
               disabled={isProcessing || remaining > 0.01}
-              className="h-12 text-lg px-8"
+              className={`h-12 text-lg px-8 ${!isAdmin ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : ''}`}
               data-testid="button-confirm-sale"
             >
               {isProcessing ? "Procesando..." : (
@@ -602,66 +675,66 @@ function VentasContent() {
       </Dialog>
 
       <Dialog open={showSaleDetails} onOpenChange={setShowSaleDetails}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className={`max-w-lg ${!isAdmin ? 'bg-slate-900 border-slate-700 text-white' : ''}`}>
           <DialogHeader>
-            <DialogTitle>Detalle de Venta</DialogTitle>
+            <DialogTitle className={!isAdmin ? 'text-white' : ''}>Detalle de Venta</DialogTitle>
           </DialogHeader>
           {selectedSale && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-muted-foreground">No. Venta:</span>
-                  <p className="font-medium">{selectedSale.sale_number}</p>
+                  <span className={!isAdmin ? 'text-slate-400' : 'text-muted-foreground'}>No. Venta:</span>
+                  <p className={`font-medium ${!isAdmin ? 'text-white' : ''}`}>{selectedSale.sale_number}</p>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Fecha:</span>
-                  <p className="font-medium">
+                  <span className={!isAdmin ? 'text-slate-400' : 'text-muted-foreground'}>Fecha:</span>
+                  <p className={`font-medium ${!isAdmin ? 'text-white' : ''}`}>
                     {format(new Date(selectedSale.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
                   </p>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-medium mb-2">Productos:</h4>
+                <h4 className={`font-medium mb-2 ${!isAdmin ? 'text-white' : ''}`}>Productos:</h4>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Producto</TableHead>
-                      <TableHead className="text-center">Cant.</TableHead>
-                      <TableHead className="text-right">Subtotal</TableHead>
+                    <TableRow className={!isAdmin ? 'border-slate-700' : ''}>
+                      <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Producto</TableHead>
+                      <TableHead className={`text-center ${!isAdmin ? 'text-slate-400' : ''}`}>Cant.</TableHead>
+                      <TableHead className={`text-right ${!isAdmin ? 'text-slate-400' : ''}`}>Subtotal</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {selectedSale.items.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.product_name}</TableCell>
-                        <TableCell className="text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.subtotal)}</TableCell>
+                      <TableRow key={item.id} className={!isAdmin ? 'border-slate-700' : ''}>
+                        <TableCell className={!isAdmin ? 'text-white' : ''}>{item.product_name}</TableCell>
+                        <TableCell className={`text-center ${!isAdmin ? 'text-slate-300' : ''}`}>{item.quantity}</TableCell>
+                        <TableCell className={`text-right ${!isAdmin ? 'text-white' : ''}`}>{formatCurrency(item.subtotal)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
 
-              <div className="bg-muted p-4 rounded-lg space-y-2">
-                <div className="flex justify-between">
+              <div className={`p-4 rounded-lg space-y-2 ${!isAdmin ? 'bg-slate-800' : 'bg-muted'}`}>
+                <div className={`flex justify-between ${!isAdmin ? 'text-slate-300' : ''}`}>
                   <span>Subtotal:</span>
                   <span>{formatCurrency(selectedSale.subtotal)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-lg">
+                <div className={`flex justify-between font-bold text-lg ${!isAdmin ? 'text-white' : ''}`}>
                   <span>Total Cobrado:</span>
                   <span>{formatCurrency(selectedSale.total)}</span>
                 </div>
-                <div className="flex justify-between text-green-600 font-medium">
+                <div className="flex justify-between text-green-500 font-medium">
                   <span>Ganancia:</span>
                   <span>{formatCurrency(selectedSale.profit)}</span>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-medium mb-2">Pagos:</h4>
+                <h4 className={`font-medium mb-2 ${!isAdmin ? 'text-white' : ''}`}>Pagos:</h4>
                 {selectedSale.payments.map((p) => (
-                  <div key={p.id} className="flex justify-between text-sm">
+                  <div key={p.id} className={`flex justify-between text-sm ${!isAdmin ? 'text-slate-300' : ''}`}>
                     <span className="capitalize">{p.payment_method}</span>
                     <span>{formatCurrency(p.amount)}</span>
                   </div>
