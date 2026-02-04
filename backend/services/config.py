@@ -13,7 +13,7 @@ OPTIONAL_ENV_VARS = {
     "ADMIN_DEFAULT_PASSWORD": "CHANGE_ME_IN_PRODUCTION",
     "SELLER_DEFAULT_PASSWORD": "CHANGE_ME_IN_PRODUCTION",
     "TUNAL_SELLER_PASSWORD": "CHANGE_ME_IN_PRODUCTION",
-    "20J_SELLER_PASSWORD": "CHANGE_ME_IN_PRODUCTION",
+    "SELLER_20J_PASSWORD": "CHANGE_ME_IN_PRODUCTION",
     "CASH_CLOSING_THRESHOLD": "50000",
     "JWT_ALGORITHM": "HS256",
     "JWT_EXPIRE_MINUTES": "1440",
@@ -52,13 +52,12 @@ def validate_environment():
     if tunal_pwd in weak_passwords:
         logger.warning("TUNAL_SELLER_PASSWORD tiene un valor débil. Considere cambiarlo.")
     
-    seller_20j_pwd = os.environ.get("20J_SELLER_PASSWORD", "")
-    logger.info(f"DEBUG: 20J_SELLER_PASSWORD length={len(seller_20j_pwd)}, blocked={blocked_passwords}, in_blocked={seller_20j_pwd in blocked_passwords}")
+    seller_20j_pwd = os.environ.get("SELLER_20J_PASSWORD", "")
     if seller_20j_pwd in blocked_passwords:
-        logger.critical("20J_SELLER_PASSWORD no está configurada o tiene valor por defecto.")
+        logger.critical("SELLER_20J_PASSWORD no está configurada o tiene valor por defecto.")
         sys.exit(1)
     if seller_20j_pwd in weak_passwords:
-        logger.warning("20J_SELLER_PASSWORD tiene un valor débil. Considere cambiarlo.")
+        logger.warning("SELLER_20J_PASSWORD tiene un valor débil. Considere cambiarlo.")
     
     logger.info("Validación de configuración completada")
 
@@ -73,5 +72,5 @@ JWT_EXPIRE_MINUTES = int(get_config("JWT_EXPIRE_MINUTES"))
 ADMIN_DEFAULT_PASSWORD = get_config("ADMIN_DEFAULT_PASSWORD")
 SELLER_DEFAULT_PASSWORD = get_config("SELLER_DEFAULT_PASSWORD")
 TUNAL_SELLER_PASSWORD = get_config("TUNAL_SELLER_PASSWORD")
-SELLER_20J_PASSWORD = get_config("20J_SELLER_PASSWORD")
+SELLER_20J_PASSWORD = get_config("SELLER_20J_PASSWORD")
 CASH_CLOSING_THRESHOLD = get_config("CASH_CLOSING_THRESHOLD")
