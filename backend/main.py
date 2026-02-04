@@ -2,6 +2,7 @@ import os
 import zipfile
 import io
 import logging
+import traceback
 from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,8 +18,9 @@ from backend.models.models import User, Store, CashRegister
 from backend.api.routes import router
 from backend.services.auth import get_password_hash
 from backend.services.backup_service import create_backup, cleanup_old_backups
+from backend.services.logging_service import setup_logging, log_error, log_critical
 
-logging.basicConfig(level=logging.INFO)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler()
@@ -34,7 +36,8 @@ def run_automatic_backup():
         if deleted > 0:
             logger.info(f"Limpieza: {deleted} backups antiguos eliminados")
     except Exception as e:
-        logger.error(f"Error en backup automático: {str(e)}")
+        log_error(logger, "Error en backup automático", e)
+        raise
     finally:
         db.close()
 
@@ -164,9 +167,22 @@ if os.path.exists(dist_path):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    stack = traceback.format_exc()
+    error_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    
+    log_critical(
+        logger,
+        f"Error ID: {error_id} | {request.method} {request.url.path} | {type(exc).__name__}: {str(exc)}",
+        exc
+    )
+    
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)}
+        content={
+            "detail": str(exc),
+            "error_id": error_id,
+            "type": type(exc).__name__
+        }
     )
 
 if __name__ == "__main__":
