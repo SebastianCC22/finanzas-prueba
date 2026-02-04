@@ -594,3 +594,35 @@ class PaymentScheduleSummary(BaseModel):
     total_pagado: float
     total_pendiente: float
     por_proveedor: List[SupplierPaymentSummary]
+
+# ========== KARDEX / STOCK MOVEMENTS ==========
+
+class StockAdjustmentCreate(BaseModel):
+    quantity: int
+    reason: str
+    adjustment_type: str  # "entrada" or "salida"
+
+class KardexMovement(BaseModel):
+    id: int
+    product_id: int
+    user_id: Optional[int]
+    user_name: Optional[str] = None
+    movement_type: str
+    quantity: int
+    previous_quantity: Optional[int]
+    new_quantity: Optional[int]
+    reason: Optional[str]
+    reference_id: Optional[int] = None
+    reference_type: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class KardexSummary(BaseModel):
+    product_id: int
+    product_name: str
+    current_stock: int
+    total_entries: int
+    total_exits: int
+    movements: List[KardexMovement]

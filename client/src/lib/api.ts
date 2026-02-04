@@ -154,6 +154,27 @@ class ApiClient {
     return this.request<StockMovement[]>(`/products/${productId}/movements`);
   }
 
+  async getProductKardex(productId: number, startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return this.request<KardexSummary>(`/products/${productId}/kardex?${params}`);
+  }
+
+  async adjustProductStock(productId: number, adjustment: StockAdjustment) {
+    return this.request<{ message: string; previous_quantity: number; new_quantity: number }>(`/products/${productId}/adjust`, {
+      method: 'POST',
+      body: adjustment,
+    });
+  }
+
+  getKardexExportUrl(productId: number, startDate?: string, endDate?: string) {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    return `${API_BASE}/products/${productId}/kardex/export?${params}`;
+  }
+
   async createSale(saleData: SaleCreate) {
     return this.request<Sale>('/sales', {
       method: 'POST',
@@ -604,6 +625,36 @@ export interface StockMovement {
   new_quantity: number | null;
   reason: string | null;
   created_at: string;
+}
+
+export interface KardexMovement {
+  id: number;
+  product_id: number;
+  user_id: number | null;
+  user_name: string | null;
+  movement_type: string;
+  quantity: number;
+  previous_quantity: number | null;
+  new_quantity: number | null;
+  reason: string | null;
+  reference_id: number | null;
+  reference_type: string | null;
+  created_at: string;
+}
+
+export interface KardexSummary {
+  product_id: number;
+  product_name: string;
+  current_stock: number;
+  total_entries: number;
+  total_exits: number;
+  movements: KardexMovement[];
+}
+
+export interface StockAdjustment {
+  quantity: number;
+  reason: string;
+  adjustment_type: 'entrada' | 'salida';
 }
 
 export interface SaleItem {

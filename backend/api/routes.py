@@ -38,7 +38,8 @@ from backend.api.schemas import (
     InvoicePaymentCreate, InvoicePaymentResponse, SupplierInvoiceSummary,
     BackupCreate, BackupResponse, BackupListResponse,
     PaymentScheduleCreate, PaymentScheduleUpdate, PaymentScheduleResponse,
-    PaymentSchedulePayment, PaymentScheduleSummary, SupplierPaymentSummary
+    PaymentSchedulePayment, PaymentScheduleSummary, SupplierPaymentSummary,
+    StockAdjustmentCreate, KardexMovement, KardexSummary
 )
 from backend.services.backup_service import create_backup, get_latest_backup, get_all_backups
 from backend.services.auth import (
@@ -338,6 +339,224 @@ def get_product_movements(product_id: int, db: Session = Depends(get_db)):
     ).order_by(StockMovement.created_at.desc()).all()
     return movements
 
+# ========== KARDEX ENDPOINTS ==========
+
+@router.get("/products/{product_id}/kardex", response_model=KardexSummary)
+def get_product_kardex(
+    product_id: int,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_viewer_or_above)
+):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
+    query = db.query(StockMovement).filter(StockMovement.product_id == product_id)
+    
+    if start_date:
+        query = query.filter(StockMovement.created_at >= datetime.strptime(start_date, "%Y-%m-%d"))
+    if end_date:
+        query = query.filter(StockMovement.created_at <= datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1))
+    
+    movements = query.order_by(StockMovement.created_at.desc()).all()
+    
+    total_entries = 0
+    total_exits = 0
+    
+    entry_types = ["entrada", "compra", "devolucion_cliente", "ajuste_positivo", "traspaso_entrada"]
+    exit_types = ["venta", "salida", "ajuste_negativo", "traspaso_salida", "devolucion_proveedor"]
+    
+    movement_list = []
+    for m in movements:
+        user_name = None
+        if m.user_id:
+            user = db.query(User).filter(User.id == m.user_id).first()
+            user_name = user.full_name if user else None
+        
+        if m.movement_type in entry_types:
+            total_entries += abs(m.quantity)
+        elif m.movement_type in exit_types:
+            total_exits += abs(m.quantity)
+        
+        movement_list.append(KardexMovement(
+            id=m.id,
+            product_id=m.product_id,
+            user_id=m.user_id,
+            user_name=user_name,
+            movement_type=m.movement_type,
+            quantity=m.quantity,
+            previous_quantity=m.previous_quantity,
+            new_quantity=m.new_quantity,
+            reason=m.reason,
+            reference_id=m.reference_id,
+            reference_type=m.reference_type,
+            created_at=m.created_at
+        ))
+    
+    return KardexSummary(
+        product_id=product.id,
+        product_name=product.name,
+        current_stock=product.quantity,
+        total_entries=total_entries,
+        total_exits=total_exits,
+        movements=movement_list
+    )
+
+@router.get("/products/{product_id}/kardex/export")
+def export_product_kardex(
+    product_id: int,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    from io import BytesIO
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
+    query = db.query(StockMovement).filter(StockMovement.product_id == product_id)
+    
+    if start_date:
+        query = query.filter(StockMovement.created_at >= datetime.strptime(start_date, "%Y-%m-%d"))
+    if end_date:
+        query = query.filter(StockMovement.created_at <= datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1))
+    
+    movements = query.order_by(StockMovement.created_at.asc()).all()
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Kardex"
+    
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="7C3AED", end_color="7C3AED", fill_type="solid")
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    ws.merge_cells('A1:F1')
+    ws['A1'] = f"KARDEX - {product.name}"
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A1'].alignment = Alignment(horizontal='center')
+    
+    ws['A2'] = f"Marca: {product.brand or 'N/A'}"
+    ws['C2'] = f"Proveedor: {product.supplier or 'N/A'}"
+    ws['E2'] = f"Stock Actual: {product.quantity}"
+    
+    headers = ["Fecha", "Tipo", "Cantidad", "Saldo Anterior", "Saldo Nuevo", "Motivo"]
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=4, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.border = thin_border
+        cell.alignment = Alignment(horizontal='center')
+    
+    movement_labels = {
+        "venta": "Venta",
+        "compra": "Compra",
+        "entrada": "Entrada",
+        "salida": "Salida",
+        "ajuste_positivo": "Ajuste (+)",
+        "ajuste_negativo": "Ajuste (-)",
+        "traspaso_entrada": "Traspaso (Entrada)",
+        "traspaso_salida": "Traspaso (Salida)",
+    }
+    
+    for row_idx, m in enumerate(movements, 5):
+        ws.cell(row=row_idx, column=1, value=m.created_at.strftime("%Y-%m-%d %H:%M")).border = thin_border
+        ws.cell(row=row_idx, column=2, value=movement_labels.get(m.movement_type, m.movement_type)).border = thin_border
+        
+        qty_cell = ws.cell(row=row_idx, column=3, value=m.quantity)
+        qty_cell.border = thin_border
+        if m.movement_type in ["entrada", "compra", "ajuste_positivo", "traspaso_entrada", "devolucion_cliente"]:
+            qty_cell.font = Font(color="059669")
+        else:
+            qty_cell.font = Font(color="DC2626")
+        
+        ws.cell(row=row_idx, column=4, value=m.previous_quantity or 0).border = thin_border
+        ws.cell(row=row_idx, column=5, value=m.new_quantity or 0).border = thin_border
+        ws.cell(row=row_idx, column=6, value=m.reason or "").border = thin_border
+    
+    ws.column_dimensions['A'].width = 18
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 12
+    ws.column_dimensions['D'].width = 15
+    ws.column_dimensions['E'].width = 15
+    ws.column_dimensions['F'].width = 30
+    
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    filename = f"kardex_{product.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    
+    return Response(
+        content=output.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@router.post("/products/{product_id}/adjust")
+def adjust_product_stock(
+    product_id: int,
+    adjustment: StockAdjustmentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
+    if adjustment.quantity <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a cero")
+    
+    if not adjustment.reason or len(adjustment.reason.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Debe proporcionar un motivo válido para el ajuste")
+    
+    previous_quantity = product.quantity
+    
+    if adjustment.adjustment_type == "entrada":
+        new_quantity = previous_quantity + adjustment.quantity
+        movement_type = "ajuste_positivo"
+    elif adjustment.adjustment_type == "salida":
+        if adjustment.quantity > previous_quantity:
+            raise HTTPException(status_code=400, detail=f"No puede sacar más de lo disponible ({previous_quantity} unidades)")
+        new_quantity = previous_quantity - adjustment.quantity
+        movement_type = "ajuste_negativo"
+    else:
+        raise HTTPException(status_code=400, detail="Tipo de ajuste inválido. Use 'entrada' o 'salida'")
+    
+    product.quantity = new_quantity
+    
+    movement = StockMovement(
+        product_id=product_id,
+        user_id=current_user.id,
+        movement_type=movement_type,
+        quantity=adjustment.quantity,
+        previous_quantity=previous_quantity,
+        new_quantity=new_quantity,
+        reason=adjustment.reason,
+        reference_type="ajuste_manual"
+    )
+    db.add(movement)
+    db.commit()
+    
+    return {
+        "message": "Ajuste realizado correctamente",
+        "previous_quantity": previous_quantity,
+        "new_quantity": new_quantity,
+        "adjustment_type": adjustment.adjustment_type,
+        "quantity": adjustment.quantity
+    }
+
 @router.post("/sales", response_model=SaleResponse)
 def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_user: User = Depends(require_seller_or_admin)):
     effective_store_id = get_effective_store_id(current_user, sale_data.store_id)
@@ -433,13 +652,13 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
                 stock_movements.append(StockMovement(
                     product_id=product.id,
                     user_id=current_user.id,
-                    movement_type="sale",
-                    quantity=-item_data.quantity,
+                    movement_type="venta",
+                    quantity=item_data.quantity,
                     previous_quantity=old_qty,
                     new_quantity=product.quantity,
                     reason=f"Venta {sale_number}",
                     reference_id=sale.id,
-                    reference_type="sale"
+                    reference_type="venta"
                 ))
         
         for movement in stock_movements:

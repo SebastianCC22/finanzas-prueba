@@ -14,6 +14,7 @@ import Egresos from "@/pages/egresos";
 import TraspasosProductos from "@/pages/traspasos-productos";
 import Transferencias from "@/pages/transferencias";
 import Inventario from "@/pages/inventario";
+import Kardex from "@/pages/kardex";
 import Apertura from "@/pages/apertura";
 import Cierre from "@/pages/cierre";
 import Reportes from "@/pages/reportes";
@@ -129,6 +130,10 @@ function Router() {
 
       <Route path="/inventario">
         {() => <PrivateRoute component={Inventario} />}
+      </Route>
+
+      <Route path="/kardex">
+        {() => <PrivateRoute component={Kardex} />}
       </Route>
 
       <Route path="/apertura">
