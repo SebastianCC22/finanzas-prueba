@@ -268,46 +268,46 @@ export default function Dashboard() {
           </div>
         </>
       ) : (
-        <div className="flex flex-col md:flex-row gap-8 justify-center items-center min-h-[60vh] mt-8">
-          <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden w-full md:w-80">
-            <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 p-8 text-white">
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-emerald-100 text-sm font-medium uppercase tracking-widest">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 min-h-[70vh]">
+          <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 p-12 text-white flex flex-col justify-center">
+            <div className="max-w-md mx-auto w-full">
+              <div className="flex items-center justify-between mb-8">
+                <span className="text-emerald-100 text-lg font-medium uppercase tracking-widest">
                   Ventas del Día
                 </span>
-                <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
-                  <ShoppingCart className="h-6 w-6" />
+                <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm">
+                  <ShoppingCart className="h-8 w-8" />
                 </div>
               </div>
-              <div className="text-5xl font-bold font-mono tracking-tight mb-2" data-testid="text-sales-today">
+              <div className="text-6xl md:text-7xl font-bold font-mono tracking-tight mb-4" data-testid="text-sales-today">
                 {formatCurrency(stats?.total_sales_today || 0)}
               </div>
-              <div className="flex items-center gap-2 text-emerald-100 text-sm">
-                <Receipt className="h-4 w-4" />
+              <div className="flex items-center gap-3 text-emerald-100 text-lg">
+                <Receipt className="h-5 w-5" />
                 <span>{stats?.sales_count_today || 0} transacciones</span>
               </div>
             </div>
-          </Card>
+          </div>
 
-          <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden w-full md:w-80">
-            <div className="bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 p-8 text-white">
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-slate-300 text-sm font-medium uppercase tracking-widest">
+          <div className="bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 p-12 text-white flex flex-col justify-center">
+            <div className="max-w-md mx-auto w-full">
+              <div className="flex items-center justify-between mb-8">
+                <span className="text-slate-300 text-lg font-medium uppercase tracking-widest">
                   Egresos del Día
                 </span>
-                <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
-                  <ArrowDownCircle className="h-6 w-6" />
+                <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-sm">
+                  <ArrowDownCircle className="h-8 w-8" />
                 </div>
               </div>
-              <div className="text-5xl font-bold font-mono tracking-tight mb-2" data-testid="text-expenses-today">
+              <div className="text-6xl md:text-7xl font-bold font-mono tracking-tight mb-4" data-testid="text-expenses-today">
                 {formatCurrency(stats?.total_expenses_today || 0)}
               </div>
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
-                <Wallet className="h-4 w-4" />
+              <div className="flex items-center gap-3 text-slate-400 text-lg">
+                <Wallet className="h-5 w-5" />
                 <span>Gastos registrados</span>
               </div>
             </div>
-          </Card>
+          </div>
         </div>
       )}
 
