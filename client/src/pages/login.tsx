@@ -149,11 +149,11 @@ export default function Login() {
         <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-200/60 overflow-hidden transition-all duration-300">
           <div className="px-8 pt-8 pb-6">
             <div className="flex items-center justify-center mb-4">
-              <div className="h-16 w-16 rounded-full overflow-hidden bg-white shadow-sm ring-1 ring-slate-100">
+              <div className="h-14 w-14 rounded-xl overflow-hidden shadow-sm border border-slate-100">
                 <img 
                   src={logoImage} 
                   alt="El Rincón Integral" 
-                  className="h-full w-full object-cover scale-150"
+                  className="h-full w-full object-cover"
                 />
               </div>
             </div>
