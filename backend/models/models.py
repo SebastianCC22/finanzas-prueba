@@ -64,10 +64,12 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255))
     role = Column(String(20), default=UserRole.SELLER.value)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    store = relationship("Store", back_populates="users")
     sales = relationship("Sale", back_populates="user")
     audit_logs = relationship("AuditLog", back_populates="user")
 
@@ -83,6 +85,7 @@ class Store(Base):
     sale_sequence = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    users = relationship("User", back_populates="store")
     cash_registers = relationship("CashRegister", back_populates="store")
     products = relationship("Product", back_populates="store")
     sales = relationship("Sale", back_populates="store")
