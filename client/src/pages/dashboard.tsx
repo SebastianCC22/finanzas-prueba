@@ -93,7 +93,7 @@ export default function Dashboard() {
                 <p className="text-emerald-100 text-sm uppercase tracking-widest mb-3">
                   Ventas del Día
                 </p>
-                <p className="text-5xl md:text-6xl font-semibold tracking-tight mb-4" data-testid="text-sales-today">
+                <p className="text-4xl md:text-5xl font-semibold tracking-tight mb-4" data-testid="text-sales-today">
                   {formatCurrency(stats?.total_sales_today || 0)}
                 </p>
                 <div className="flex items-center gap-2 text-emerald-100">
@@ -113,7 +113,7 @@ export default function Dashboard() {
                 <p className="text-rose-100 text-sm uppercase tracking-widest mb-3">
                   Egresos del Día
                 </p>
-                <p className="text-5xl md:text-6xl font-semibold tracking-tight mb-4" data-testid="text-expenses-today">
+                <p className="text-4xl md:text-5xl font-semibold tracking-tight mb-4" data-testid="text-expenses-today">
                   {formatCurrency(stats?.total_expenses_today || 0)}
                 </p>
                 <div className="flex items-center gap-2 text-rose-100">
