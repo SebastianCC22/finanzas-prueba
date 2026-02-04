@@ -371,6 +371,9 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
     if total_payments < total:
         raise HTTPException(status_code=400, detail="El pago no cubre el total de la venta")
     
+    db.commit()
+    db.refresh(sale)
+    
     audit = AuditLog(
         user_id=current_user.id,
         action="create_sale",
@@ -379,9 +382,8 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
         new_values=f"Sale {sale_number} - Total: ${total}"
     )
     db.add(audit)
-    
     db.commit()
-    db.refresh(sale)
+    
     return sale
 
 @router.get("/sales", response_model=List[SaleResponse])
@@ -488,6 +490,9 @@ def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), curr
         if register:
             register.current_balance -= refund_amount
     
+    db.commit()
+    db.refresh(return_record)
+    
     audit = AuditLog(
         user_id=current_user.id,
         action="create_return",
@@ -496,9 +501,8 @@ def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), curr
         new_values=f"Return for sale {sale.sale_number} - Refund: ${total_refund}"
     )
     db.add(audit)
-    
     db.commit()
-    db.refresh(return_record)
+    
     return return_record
 
 @router.get("/returns", response_model=List[ReturnResponse])
@@ -660,6 +664,9 @@ def create_expense(expense_data: ExpenseCreate, db: Session = Depends(get_db), c
     if register:
         register.current_balance -= Decimal(str(expense_data.amount))
     
+    db.commit()
+    db.refresh(expense)
+    
     audit = AuditLog(
         user_id=current_user.id,
         action="create_expense",
@@ -668,9 +675,8 @@ def create_expense(expense_data: ExpenseCreate, db: Session = Depends(get_db), c
         new_values=f"Expense: ${expense_data.amount} - {expense_data.description}"
     )
     db.add(audit)
-    
     db.commit()
-    db.refresh(expense)
+    
     return expense
 
 @router.get("/expenses", response_model=List[ExpenseResponse])
@@ -722,6 +728,9 @@ def create_cash_transfer(
     from_register.current_balance -= Decimal(str(transfer_data.amount))
     to_register.current_balance += Decimal(str(transfer_data.amount))
     
+    db.commit()
+    db.refresh(transfer)
+    
     audit = AuditLog(
         user_id=current_user.id,
         action="create_cash_transfer",
@@ -730,9 +739,8 @@ def create_cash_transfer(
         new_values=f"Transfer: ${transfer_data.amount} from {from_register.name} to {to_register.name}"
     )
     db.add(audit)
-    
     db.commit()
-    db.refresh(transfer)
+    
     return transfer
 
 @router.get("/cash-transfers", response_model=List[CashTransferResponse])
@@ -776,6 +784,8 @@ def create_cash_opening(
         notes=opening_data.notes
     )
     db.add(opening)
+    db.commit()
+    db.refresh(opening)
     
     audit = AuditLog(
         user_id=current_user.id,
@@ -785,9 +795,8 @@ def create_cash_opening(
         new_values=f"Opening: ${opening_data.initial_balance}"
     )
     db.add(audit)
-    
     db.commit()
-    db.refresh(opening)
+    
     return opening
 
 @router.get("/cash-openings", response_model=List[CashOpeningResponse])
@@ -923,6 +932,8 @@ def create_cash_closing(
         notes=closing_data.notes
     )
     db.add(closing)
+    db.commit()
+    db.refresh(closing)
     
     audit = AuditLog(
         user_id=current_user.id,
@@ -932,9 +943,8 @@ def create_cash_closing(
         new_values=f"Closing: Expected ${expected_balance}, Actual ${closing_data.actual_balance}, Diff ${difference}"
     )
     db.add(audit)
-    
     db.commit()
-    db.refresh(closing)
+    
     return closing
 
 @router.get("/cash-closings", response_model=List[CashClosingResponse])
@@ -976,6 +986,9 @@ def update_cash_closing(
     if update_data.notes is not None:
         closing.notes = update_data.notes
     
+    db.commit()
+    db.refresh(closing)
+    
     audit = AuditLog(
         user_id=current_user.id,
         action="update_cash_closing",
@@ -984,9 +997,8 @@ def update_cash_closing(
         new_values=f"Updated: balance={update_data.actual_balance}, notes={update_data.notes}"
     )
     db.add(audit)
-    
     db.commit()
-    db.refresh(closing)
+    
     return closing
 
 @router.get("/alerts", response_model=List[AlertResponse])
@@ -1062,17 +1074,17 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
     if store_id:
         cost_base_query = cost_base_query.filter(Sale.store_id == store_id)
     
-    cost_today = float(cost_base_query.filter(func.date(Sale.created_at) == today).scalar() or 0)
-    cost_week = float(cost_base_query.filter(Sale.created_at >= week_ago).scalar() or 0)
-    cost_month = float(cost_base_query.filter(Sale.created_at >= month_ago).scalar() or 0)
+    cost_today = Decimal(str(cost_base_query.filter(func.date(Sale.created_at) == today).scalar() or 0))
+    cost_week = Decimal(str(cost_base_query.filter(Sale.created_at >= week_ago).scalar() or 0))
+    cost_month = Decimal(str(cost_base_query.filter(Sale.created_at >= month_ago).scalar() or 0))
     
-    profit_today = float(total_sales_today or 0) - cost_today - float(total_expenses_today or 0)
-    profit_week = float(total_sales_week or 0) - cost_week - float(total_expenses_week or 0)
-    profit_month = float(total_sales_month or 0) - cost_month - float(total_expenses_month or 0)
+    profit_today = Decimal(str(total_sales_today or 0)) - cost_today - Decimal(str(total_expenses_today or 0))
+    profit_week = Decimal(str(total_sales_week or 0)) - cost_week - Decimal(str(total_expenses_week or 0))
+    profit_month = Decimal(str(total_sales_month or 0)) - cost_month - Decimal(str(total_expenses_month or 0))
     
-    average_ticket = 0
+    average_ticket = Decimal('0')
     if sales_count_month and sales_count_month > 0:
-        average_ticket = float(total_sales_month or 0) / sales_count_month
+        average_ticket = Decimal(str(total_sales_month or 0)) / Decimal(str(sales_count_month))
     
     products_query = db.query(Product).filter(Product.is_active == True)
     if store_id:
@@ -1091,9 +1103,9 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
         Product.expiration_date <= expiration_threshold
     ).count()
     
-    inventory_value = float(products_query.with_entities(
+    inventory_value = Decimal(str(products_query.with_entities(
         func.coalesce(func.sum(Product.cost * Product.quantity), 0)
-    ).scalar() or 0)
+    ).scalar() or 0))
     
     alerts_query = db.query(Alert).filter(Alert.is_read == False, Alert.is_resolved == False)
     if store_id:
@@ -1101,12 +1113,12 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
     unread_alerts = alerts_query.count()
     
     return DashboardStats(
-        total_sales_today=float(total_sales_today or 0),
-        total_sales_week=float(total_sales_week or 0),
-        total_sales_month=float(total_sales_month or 0),
-        total_expenses_today=float(total_expenses_today or 0),
-        total_expenses_week=float(total_expenses_week or 0),
-        total_expenses_month=float(total_expenses_month or 0),
+        total_sales_today=Decimal(str(total_sales_today or 0)),
+        total_sales_week=Decimal(str(total_sales_week or 0)),
+        total_sales_month=Decimal(str(total_sales_month or 0)),
+        total_expenses_today=Decimal(str(total_expenses_today or 0)),
+        total_expenses_week=Decimal(str(total_expenses_week or 0)),
+        total_expenses_month=Decimal(str(total_expenses_month or 0)),
         products_low_stock=products_low_stock,
         products_out_of_stock=products_out_of_stock,
         products_expiring_soon=products_expiring_soon,
@@ -1146,15 +1158,15 @@ def get_advanced_stats(
     
     payment_results = payment_query.group_by(Payment.payment_method).all()
     
-    total_payments = sum(float(r.total or 0) for r in payment_results)
+    total_payments = sum(Decimal(str(r.total or 0)) for r in payment_results)
     payment_stats = []
     for r in payment_results:
-        pct = (float(r.total or 0) / total_payments * 100) if total_payments > 0 else 0
+        pct = (Decimal(str(r.total or 0)) / total_payments * 100) if total_payments > 0 else Decimal('0')
         payment_stats.append(PaymentMethodStats(
             payment_method=r.payment_method,
-            total_amount=float(r.total or 0),
+            total_amount=Decimal(str(r.total or 0)),
             transaction_count=r.count,
-            percentage=round(pct, 1)
+            percentage=round(float(pct), 1)
         ))
     
     stores_query = db.query(Store).filter(Store.is_active == True)
@@ -1176,22 +1188,22 @@ def get_advanced_stats(
             Sale.created_at >= month_ago
         ).scalar()
         
-        cost_total = float(db.query(
+        cost_total = Decimal(str(db.query(
             func.coalesce(func.sum(Product.cost * SaleItem.quantity), 0)
         ).select_from(SaleItem).join(Sale).outerjoin(
             Product, SaleItem.product_id == Product.id
         ).filter(
             Sale.store_id == store.id,
             Sale.created_at >= month_ago
-        ).scalar() or 0)
+        ).scalar() or 0))
         
-        profit = float(sales_total or 0) - cost_total - float(expenses_total or 0)
+        profit = Decimal(str(sales_total or 0)) - cost_total - Decimal(str(expenses_total or 0))
         
         store_stats.append(StoreStats(
             store_id=store.id,
             store_name=store.name,
-            total_sales=float(sales_total or 0),
-            total_expenses=float(expenses_total or 0),
+            total_sales=Decimal(str(sales_total or 0)),
+            total_expenses=Decimal(str(expenses_total or 0)),
             profit=profit,
             sales_count=sales_count or 0
         ))
@@ -1214,7 +1226,7 @@ def get_advanced_stats(
         product_id=r.product_id or 0,
         product_name=r.product_name,
         quantity_sold=int(r.qty or 0),
-        total_revenue=float(r.revenue or 0)
+        total_revenue=Decimal(str(r.revenue or 0))
     ) for r in top_results]
     
     least_results = top_products_query.group_by(
@@ -1225,7 +1237,7 @@ def get_advanced_stats(
         product_id=r.product_id or 0,
         product_name=r.product_name,
         quantity_sold=int(r.qty or 0),
-        total_revenue=float(r.revenue or 0)
+        total_revenue=Decimal(str(r.revenue or 0))
     ) for r in least_results]
     
     return AdvancedStats(
@@ -1391,7 +1403,7 @@ def get_suppliers(
             created_at=s.created_at,
             updated_at=s.updated_at,
             invoices_count=invoices_count,
-            pending_amount=float(pending)
+            pending_amount=Decimal(str(pending))
         ))
     return result
 
@@ -1456,7 +1468,7 @@ def update_supplier(
         created_at=db_supplier.created_at,
         updated_at=db_supplier.updated_at,
         invoices_count=invoices_count,
-        pending_amount=float(pending)
+        pending_amount=Decimal(str(pending))
     )
 
 @router.get("/supplier-invoices", response_model=List[SupplierInvoiceResponse])
@@ -1501,8 +1513,8 @@ def get_supplier_invoices(
             invoice_number=inv.invoice_number,
             issue_date=inv.issue_date,
             due_date=inv.due_date,
-            total_amount=float(inv.total_amount),
-            paid_amount=float(inv.paid_amount),
+            total_amount=Decimal(str(inv.total_amount)),
+            paid_amount=Decimal(str(inv.paid_amount)),
             payment_type=inv.payment_type,
             status=inv.status,
             image_url=inv.image_url,
@@ -1510,11 +1522,11 @@ def get_supplier_invoices(
             created_at=inv.created_at,
             updated_at=inv.updated_at,
             supplier_name=supplier.name if supplier else "",
-            remaining_amount=float(inv.total_amount - inv.paid_amount),
+            remaining_amount=Decimal(str(inv.total_amount)) - Decimal(str(inv.paid_amount)),
             payments=[InvoicePaymentResponse(
                 id=p.id,
                 invoice_id=p.invoice_id,
-                amount=float(p.amount),
+                amount=Decimal(str(p.amount)),
                 payment_date=p.payment_date,
                 payment_method=p.payment_method,
                 reference=p.reference,
@@ -1554,8 +1566,8 @@ def create_supplier_invoice(
         invoice_number=db_invoice.invoice_number,
         issue_date=db_invoice.issue_date,
         due_date=db_invoice.due_date,
-        total_amount=float(db_invoice.total_amount),
-        paid_amount=0,
+        total_amount=Decimal(str(db_invoice.total_amount)),
+        paid_amount=Decimal('0'),
         payment_type=db_invoice.payment_type,
         status=db_invoice.status,
         image_url=db_invoice.image_url,
@@ -1563,7 +1575,7 @@ def create_supplier_invoice(
         created_at=db_invoice.created_at,
         updated_at=db_invoice.updated_at,
         supplier_name=supplier.name,
-        remaining_amount=float(db_invoice.total_amount),
+        remaining_amount=Decimal(str(db_invoice.total_amount)),
         payments=[]
     )
 
@@ -1594,8 +1606,8 @@ def update_supplier_invoice(
         invoice_number=db_invoice.invoice_number,
         issue_date=db_invoice.issue_date,
         due_date=db_invoice.due_date,
-        total_amount=float(db_invoice.total_amount),
-        paid_amount=float(db_invoice.paid_amount),
+        total_amount=Decimal(str(db_invoice.total_amount)),
+        paid_amount=Decimal(str(db_invoice.paid_amount)),
         payment_type=db_invoice.payment_type,
         status=db_invoice.status,
         image_url=db_invoice.image_url,
@@ -1603,11 +1615,11 @@ def update_supplier_invoice(
         created_at=db_invoice.created_at,
         updated_at=db_invoice.updated_at,
         supplier_name=supplier.name if supplier else "",
-        remaining_amount=float(db_invoice.total_amount - db_invoice.paid_amount),
+        remaining_amount=Decimal(str(db_invoice.total_amount)) - Decimal(str(db_invoice.paid_amount)),
         payments=[InvoicePaymentResponse(
             id=p.id,
             invoice_id=p.invoice_id,
-            amount=float(p.amount),
+            amount=Decimal(str(p.amount)),
             payment_date=p.payment_date,
             payment_method=p.payment_method,
             reference=p.reference,
@@ -1627,24 +1639,24 @@ def add_invoice_payment(
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    remaining = float(db_invoice.total_amount) - float(db_invoice.paid_amount)
-    if payment.amount > remaining:
+    remaining = Decimal(str(db_invoice.total_amount)) - Decimal(str(db_invoice.paid_amount))
+    if Decimal(str(payment.amount)) > remaining:
         raise HTTPException(status_code=400, detail=f"Payment amount exceeds remaining balance of {remaining}")
     
     db_payment = InvoicePayment(
         invoice_id=invoice_id,
-        amount=payment.amount,
+        amount=Decimal(str(payment.amount)),
         payment_method=payment.payment_method,
         reference=payment.reference,
         notes=payment.notes
     )
     db.add(db_payment)
     
-    db_invoice.paid_amount = float(db_invoice.paid_amount) + payment.amount
+    db_invoice.paid_amount = Decimal(str(db_invoice.paid_amount)) + Decimal(str(payment.amount))
     
-    if db_invoice.paid_amount >= float(db_invoice.total_amount):
+    if Decimal(str(db_invoice.paid_amount)) >= Decimal(str(db_invoice.total_amount)):
         db_invoice.status = "pagada"
-    elif db_invoice.paid_amount > 0:
+    elif Decimal(str(db_invoice.paid_amount)) > 0:
         db_invoice.status = "parcial"
     
     db.commit()
@@ -1659,8 +1671,8 @@ def add_invoice_payment(
         invoice_number=db_invoice.invoice_number,
         issue_date=db_invoice.issue_date,
         due_date=db_invoice.due_date,
-        total_amount=float(db_invoice.total_amount),
-        paid_amount=float(db_invoice.paid_amount),
+        total_amount=Decimal(str(db_invoice.total_amount)),
+        paid_amount=Decimal(str(db_invoice.paid_amount)),
         payment_type=db_invoice.payment_type,
         status=db_invoice.status,
         image_url=db_invoice.image_url,
@@ -1668,11 +1680,11 @@ def add_invoice_payment(
         created_at=db_invoice.created_at,
         updated_at=db_invoice.updated_at,
         supplier_name=supplier.name if supplier else "",
-        remaining_amount=float(db_invoice.total_amount - db_invoice.paid_amount),
+        remaining_amount=Decimal(str(db_invoice.total_amount)) - Decimal(str(db_invoice.paid_amount)),
         payments=[InvoicePaymentResponse(
             id=p.id,
             invoice_id=p.invoice_id,
-            amount=float(p.amount),
+            amount=Decimal(str(p.amount)),
             payment_date=p.payment_date,
             payment_method=p.payment_method,
             reference=p.reference,
@@ -1717,9 +1729,9 @@ def get_invoice_summary(
     ).count()
     
     return SupplierInvoiceSummary(
-        total_pending=float(pending),
-        total_overdue=float(overdue),
-        total_paid_this_month=float(paid_this_month),
+        total_pending=Decimal(str(pending)),
+        total_overdue=Decimal(str(overdue)),
+        total_paid_this_month=Decimal(str(paid_this_month)),
         invoices_pending_count=pending_count,
         invoices_overdue_count=overdue_count,
         invoices_due_soon_count=due_soon_count

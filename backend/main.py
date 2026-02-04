@@ -114,44 +114,6 @@ app.include_router(router, prefix="/api")
 def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-@app.get("/api/download-source")
-def download_source():
-    """Download the entire source code as a ZIP file"""
-    import tempfile
-    import shutil
-    
-    include_dirs = ['backend', 'client', 'server', 'shared']
-    include_files = ['package.json', 'tsconfig.json', 'vite.config.ts', 'drizzle.config.ts', 'tailwind.config.ts', 'postcss.config.js', 'requirements.txt']
-    
-    temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
-    temp_zip.close()
-    
-    with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for dir_name in include_dirs:
-            if os.path.exists(dir_name):
-                for root, dirs, files in os.walk(dir_name):
-                    dirs[:] = [d for d in dirs if d != '__pycache__' and not d.startswith('.')]
-                    for file in files:
-                        if not file.endswith(('.pyc', '.pyo')):
-                            file_path = os.path.join(root, file)
-                            try:
-                                zf.write(file_path, file_path)
-                            except:
-                                pass
-        
-        for file_name in include_files:
-            if os.path.exists(file_name):
-                try:
-                    zf.write(file_name, file_name)
-                except:
-                    pass
-    
-    return FileResponse(
-        temp_zip.name,
-        media_type="application/zip",
-        filename="finanzas-rincon-integral.zip"
-    )
-
 dist_path = "dist/public"
 if os.path.exists(dist_path):
     app.mount("/assets", StaticFiles(directory=f"{dist_path}/assets"), name="assets")

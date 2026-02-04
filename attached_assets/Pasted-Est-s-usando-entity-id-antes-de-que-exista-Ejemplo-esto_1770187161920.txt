@@ -1,0 +1,138 @@
+Estás usando entity_id antes de que exista.
+
+Ejemplo (esto está MAL):
+
+db.add(closing)
+
+audit = AuditLog(
+    entity_id=closing.id  # ❌ aquí todavía es None
+)
+
+✅ SOLUCIÓN (COPIA Y PEGA ESTE PATRÓN)
+📌 Regla obligatoria
+
+SIEMPRE:
+
+add
+
+commit
+
+refresh
+
+luego AuditLog
+
+🔁 EJEMPLO CONCRETO (cash closing)
+
+🔴 BORRA el bloque actual donde creas AuditLog
+
+🟢 REEMPLAZA por esto:
+
+db.add(closing)
+db.commit()
+db.refresh(closing)
+
+audit = AuditLog(
+    user_id=current_user.id,
+    action="create_cash_closing",
+    entity_type="cash_closing",
+    entity_id=closing.id,
+    new_values={
+        "expected_amount": float(expected),
+        "actual_amount": float(actual),
+        "difference": float(difference)
+    }
+)
+
+db.add(audit)
+db.commit()
+
+
+📌 Haz esto mismo en:
+
+create_cash_opening
+
+update_cash_opening
+
+create_cash_closing
+
+update_cash_closing
+
+cualquier endpoint que use AuditLog
+
+👉 Uno por uno. Sin excepción.
+
+🔧 ARREGLO 2 (CRÍTICO): DINERO CON float ❌
+❌ PROBLEMA
+
+Estás usando float para plata. Eso rompe cierres.
+
+Ejemplo MAL:
+
+remaining = float(db_invoice.total_amount) - float(db_invoice.paid_amount)
+
+✅ SOLUCIÓN GLOBAL
+1️⃣ ARRIBA DEL ARCHIVO
+
+Agrega esto (si no está):
+
+from decimal import Decimal
+
+2️⃣ CAMBIA ESTO (EJEMPLO REAL)
+
+🔴 ANTES
+
+remaining = float(db_invoice.total_amount) - float(db_invoice.paid_amount)
+db_invoice.paid_amount = float(db_invoice.paid_amount) + payment.amount
+
+
+🟢 DESPUÉS
+
+remaining = Decimal(db_invoice.total_amount) - Decimal(db_invoice.paid_amount)
+db_invoice.paid_amount = Decimal(db_invoice.paid_amount) + Decimal(payment.amount)
+
+
+📌 REGLA
+👉 Si ves float( en código financiero → cámbialo por Decimal
+
+🔧 ARREGLO 3 (URGENTE): QUITA /api/download-source
+❌ PROBLEMA
+
+Cualquiera puede bajarse todo tu backend.
+
+✅ SOLUCIÓN RÁPIDA
+🔴 BORRA COMPLETO ESTE ENDPOINT
+@app.get("/api/download-source")
+def download_source():
+    ...
+
+
+🚫 TODO ese bloque, elimínalo.
+
+🔧 ARREGLO 4: allow_origins=["*"] (por ahora simple)
+
+Déjalo solo temporalmente, pero marca esto para luego:
+
+allow_origins=[
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
+
+
+(No es bloqueo ahora, solo nota mental.)
+
+🔧 ARREGLO 5: EVITAR ERRORES SILENCIOSOS
+
+Busca esto en main.py:
+
+except:
+    pass
+
+
+❌ Eso está prohibido.
+
+✅ Cámbialo por:
+except Exception as e:
+    print(e)
+
+
+Hazlo en todos los try/except del ZIP.
