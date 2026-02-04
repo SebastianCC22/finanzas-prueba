@@ -16,7 +16,7 @@ import pytz
 from backend.models.database import engine, Base, SessionLocal
 from backend.models.models import User, Store, CashRegister
 from backend.api.routes import router
-from backend.services.auth import get_password_hash
+from backend.services.security import hash_password
 from backend.services.backup_service import create_backup, cleanup_old_backups
 from backend.services.logging_service import setup_logging, log_error, log_critical
 from backend.services.config import validate_environment, ADMIN_DEFAULT_PASSWORD, SELLER_DEFAULT_PASSWORD, TUNAL_SELLER_PASSWORD, SELLER_20J_PASSWORD
@@ -51,17 +51,22 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         admin = db.query(User).filter(User.username == "Administrador").first()
+        admin_password = ADMIN_DEFAULT_PASSWORD
         if not admin:
             admin = User(
                 username="Administrador",
                 email="admin@example.com",
-                password_hash=get_password_hash(ADMIN_DEFAULT_PASSWORD),
+                password_hash=hash_password(admin_password),
                 full_name="Administrador",
                 role="admin"
             )
             db.add(admin)
             db.commit()
             logger.info("Usuario admin por defecto creado: Administrador")
+        else:
+            admin.password_hash = hash_password(admin_password)
+            db.commit()
+            logger.info("Contraseña de Administrador actualizada")
         
         stores = db.query(Store).all()
         if not stores:
@@ -82,7 +87,7 @@ async def lifespan(app: FastAPI):
             cajero_tunal = User(
                 username="Cajero Tunal",
                 email="cajero.tunal@example.com",
-                password_hash=get_password_hash(TUNAL_SELLER_PASSWORD),
+                password_hash=hash_password(TUNAL_SELLER_PASSWORD),
                 full_name="Cajero Tunal",
                 role="seller",
                 store_id=store_tunal.id
@@ -91,7 +96,7 @@ async def lifespan(app: FastAPI):
             db.commit()
             logger.info("Usuario Cajero Tunal creado")
         elif cajero_tunal:
-            cajero_tunal.password_hash = get_password_hash(TUNAL_SELLER_PASSWORD)
+            cajero_tunal.password_hash = hash_password(TUNAL_SELLER_PASSWORD)
             db.commit()
             logger.info("Contraseña de Cajero Tunal actualizada")
         
@@ -100,7 +105,7 @@ async def lifespan(app: FastAPI):
             cajero_20j = User(
                 username="Cajero 20J",
                 email="cajero.20j@example.com",
-                password_hash=get_password_hash(SELLER_20J_PASSWORD),
+                password_hash=hash_password(SELLER_20J_PASSWORD),
                 full_name="Cajero 20 de Julio",
                 role="seller",
                 store_id=store_20.id
@@ -109,7 +114,7 @@ async def lifespan(app: FastAPI):
             db.commit()
             logger.info("Usuario Cajero 20J creado")
         elif cajero_20j:
-            cajero_20j.password_hash = get_password_hash(SELLER_20J_PASSWORD)
+            cajero_20j.password_hash = hash_password(SELLER_20J_PASSWORD)
             db.commit()
             logger.info("Contraseña de Cajero 20J actualizada")
         
