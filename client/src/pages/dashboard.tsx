@@ -268,44 +268,36 @@ export default function Dashboard() {
           </div>
         </>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 min-h-[70vh]">
-          <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 p-12 text-white flex flex-col justify-center">
-            <div className="max-w-md mx-auto w-full">
-              <div className="flex items-center justify-between mb-8">
-                <span className="text-emerald-100 text-lg font-medium uppercase tracking-widest">
-                  Ventas del Día
-                </span>
-                <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm">
-                  <ShoppingCart className="h-8 w-8" />
-                </div>
+        <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 w-full max-w-4xl">
+            <div className="text-center py-12">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 mb-6">
+                <ShoppingCart className="h-7 w-7 text-emerald-600" />
               </div>
-              <div className="text-6xl md:text-7xl font-bold font-mono tracking-tight mb-4" data-testid="text-sales-today">
+              <p className="text-sm text-muted-foreground uppercase tracking-widest mb-4">
+                Ventas del Día
+              </p>
+              <p className="text-5xl md:text-6xl font-light text-foreground tracking-tight mb-3" data-testid="text-sales-today">
                 {formatCurrency(stats?.total_sales_today || 0)}
-              </div>
-              <div className="flex items-center gap-3 text-emerald-100 text-lg">
-                <Receipt className="h-5 w-5" />
-                <span>{stats?.sales_count_today || 0} transacciones</span>
-              </div>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {stats?.sales_count_today || 0} transacciones
+              </p>
             </div>
-          </div>
 
-          <div className="bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 p-12 text-white flex flex-col justify-center">
-            <div className="max-w-md mx-auto w-full">
-              <div className="flex items-center justify-between mb-8">
-                <span className="text-slate-300 text-lg font-medium uppercase tracking-widest">
-                  Egresos del Día
-                </span>
-                <div className="bg-white/10 p-4 rounded-2xl backdrop-blur-sm">
-                  <ArrowDownCircle className="h-8 w-8" />
-                </div>
+            <div className="text-center py-12 md:border-l md:border-border">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-rose-50 mb-6">
+                <ArrowDownCircle className="h-7 w-7 text-rose-500" />
               </div>
-              <div className="text-6xl md:text-7xl font-bold font-mono tracking-tight mb-4" data-testid="text-expenses-today">
+              <p className="text-sm text-muted-foreground uppercase tracking-widest mb-4">
+                Egresos del Día
+              </p>
+              <p className="text-5xl md:text-6xl font-light text-foreground tracking-tight mb-3" data-testid="text-expenses-today">
                 {formatCurrency(stats?.total_expenses_today || 0)}
-              </div>
-              <div className="flex items-center gap-3 text-slate-400 text-lg">
-                <Wallet className="h-5 w-5" />
-                <span>Gastos registrados</span>
-              </div>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Gastos registrados
+              </p>
             </div>
           </div>
         </div>
