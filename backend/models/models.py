@@ -364,6 +364,8 @@ class SupplierInvoice(Base):
     payment_type = Column(String(20), default="efectivo")
     status = Column(String(20), default="pendiente")
     image_url = Column(String(500))
+    invoice_file_url = Column(String(500), nullable=True)
+    invoice_file_name = Column(String(255), nullable=True)
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

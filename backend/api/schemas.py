@@ -500,10 +500,13 @@ class SupplierInvoiceResponse(SupplierInvoiceBase):
     paid_amount: float
     status: str
     image_url: Optional[str]
+    invoice_file_url: Optional[str] = None
+    invoice_file_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     supplier_name: str = ""
     remaining_amount: float = 0
+    has_file: bool = False
     payments: List[InvoicePaymentResponse] = []
 
     class Config:
