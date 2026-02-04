@@ -38,7 +38,7 @@ from backend.api.schemas import (
 from backend.services.backup_service import create_backup, get_latest_backup, get_all_backups
 from backend.services.auth import (
     get_password_hash, verify_password, create_access_token,
-    get_current_user, require_admin
+    get_current_user, require_admin, require_seller_or_admin, require_viewer_or_above
 )
 from backend.services.export import (
     export_to_excel, export_to_pdf,
@@ -270,7 +270,7 @@ def get_product_movements(product_id: int, db: Session = Depends(get_db)):
     return movements
 
 @router.post("/sales", response_model=SaleResponse)
-def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_user: User = Depends(require_seller_or_admin)):
     today = datetime.now()
     opening = db.query(CashOpening).filter(
         CashOpening.store_id == sale_data.store_id,
@@ -435,7 +435,7 @@ def get_sale(sale_id: int, db: Session = Depends(get_db)):
     return sale
 
 @router.post("/returns", response_model=ReturnResponse)
-def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), current_user: User = Depends(require_seller_or_admin)):
     sale = db.query(Sale).filter(Sale.id == return_data.sale_id, Sale.deleted_at == None).first()
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada o eliminada")
@@ -563,7 +563,7 @@ def get_returns(
 def create_product_transfer(
     transfer_data: ProductTransferCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     from_product = db.query(Product).filter(
         Product.id == transfer_data.product_id,
@@ -685,7 +685,7 @@ def get_product_transfers(
     return result
 
 @router.post("/expenses", response_model=ExpenseResponse)
-def create_expense(expense_data: ExpenseCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_expense(expense_data: ExpenseCreate, db: Session = Depends(get_db), current_user: User = Depends(require_seller_or_admin)):
     register = db.query(CashRegister).filter(CashRegister.id == expense_data.cash_register_id).with_for_update().first()
     if not register:
         raise HTTPException(status_code=404, detail="Caja no encontrada")
@@ -753,7 +753,7 @@ def get_expenses(
 def create_cash_transfer(
     transfer_data: CashTransferCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     from_register = db.query(CashRegister).filter(CashRegister.id == transfer_data.from_register_id).with_for_update().first()
     to_register = db.query(CashRegister).filter(CashRegister.id == transfer_data.to_register_id).with_for_update().first()
@@ -826,7 +826,7 @@ def get_cash_transfers(
 def create_cash_opening(
     opening_data: CashOpeningCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_seller_or_admin)
 ):
     today = datetime.now().date()
     existing = db.query(CashOpening).filter(
@@ -904,7 +904,7 @@ def update_cash_opening(
     opening_id: int,
     update_data: CashOpeningUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     opening = db.query(CashOpening).filter(CashOpening.id == opening_id).first()
     if not opening:
@@ -938,7 +938,7 @@ CASH_CLOSING_DIFFERENCE_THRESHOLD = Decimal(os.environ.get("CASH_CLOSING_THRESHO
 def create_cash_closing(
     closing_data: CashClosingCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_seller_or_admin)
 ):
     opening = db.query(CashOpening).filter(CashOpening.id == closing_data.opening_id).first()
     if not opening:

@@ -67,9 +67,23 @@ async def get_current_user(
     return user
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Solo usuarios con rol ADMIN"""
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
+            detail="Se requiere acceso de administrador"
         )
+    return current_user
+
+def require_seller_or_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Usuarios con rol ADMIN o SELLER pueden realizar ventas y devoluciones"""
+    if current_user.role not in ["admin", "seller"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requiere acceso de vendedor o administrador"
+        )
+    return current_user
+
+def require_viewer_or_above(current_user: User = Depends(get_current_user)) -> User:
+    """Cualquier usuario autenticado (ADMIN, SELLER, VIEWER) - solo lectura para VIEWER"""
     return current_user
