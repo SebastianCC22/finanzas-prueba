@@ -241,6 +241,7 @@ export default function Proveedores() {
                     value={supplierForm.name}
                     onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
                     placeholder="Nombre del proveedor"
+                    data-testid="input-supplier-name"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -288,8 +289,8 @@ export default function Proveedores() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowSupplierDialog(false)}>Cancelar</Button>
-                <Button onClick={handleCreateSupplier} disabled={!supplierForm.name}>
+                <Button variant="outline" onClick={() => setShowSupplierDialog(false)} data-testid="button-cancel-supplier">Cancelar</Button>
+                <Button onClick={handleCreateSupplier} disabled={!supplierForm.name} data-testid="button-save-supplier">
                   {editingSupplier ? "Actualizar" : "Crear"}
                 </Button>
               </DialogFooter>
@@ -387,10 +388,11 @@ export default function Proveedores() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowInvoiceDialog(false)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setShowInvoiceDialog(false)} data-testid="button-cancel-invoice">Cancelar</Button>
                 <Button 
                   onClick={handleCreateInvoice}
                   disabled={!invoiceForm.supplier_id || !invoiceForm.invoice_number || !invoiceForm.total_amount || !invoiceForm.due_date}
+                  data-testid="button-save-invoice"
                 >
                   Registrar
                 </Button>
@@ -678,8 +680,8 @@ export default function Proveedores() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>Cancelar</Button>
-            <Button onClick={handleAddPayment} disabled={!paymentForm.amount || paymentForm.amount <= 0}>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)} data-testid="button-cancel-payment">Cancelar</Button>
+            <Button onClick={handleAddPayment} disabled={!paymentForm.amount || paymentForm.amount <= 0} data-testid="button-save-payment">
               Registrar Pago
             </Button>
           </DialogFooter>
