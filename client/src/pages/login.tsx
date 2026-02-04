@@ -148,11 +148,11 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-200/60 overflow-hidden transition-all duration-300">
           <div className="px-8 pt-8 pb-6">
-            <div className="flex items-center justify-center mb-5">
+            <div className="flex items-center justify-center mb-4">
               <img 
                 src={logoImage} 
                 alt="El Rincón Integral" 
-                className="h-24 w-auto object-contain drop-shadow-sm"
+                className="h-16 w-auto object-contain"
               />
             </div>
             
