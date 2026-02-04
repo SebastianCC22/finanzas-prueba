@@ -465,7 +465,7 @@ export default function Proveedores() {
                 </div>
                 <div className="flex gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
                       <SelectValue placeholder="Estado" />
                     </SelectTrigger>
                     <SelectContent>
@@ -476,7 +476,7 @@ export default function Proveedores() {
                     </SelectContent>
                   </Select>
                   <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[180px]" data-testid="select-supplier-filter">
                       <SelectValue placeholder="Proveedor" />
                     </SelectTrigger>
                     <SelectContent>
@@ -539,6 +539,7 @@ export default function Proveedores() {
                                 setPaymentForm({ amount: invoice.remaining_amount, payment_method: "efectivo", reference: "", notes: "" });
                                 setShowPaymentDialog(true);
                               }}
+                              data-testid={`button-pay-invoice-${invoice.id}`}
                             >
                               <CreditCard className="h-4 w-4 mr-1" />
                               Pagar
@@ -549,6 +550,7 @@ export default function Proveedores() {
                             size="sm"
                             className="text-destructive"
                             onClick={() => handleDeleteInvoice(invoice.id)}
+                            data-testid={`button-delete-invoice-${invoice.id}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

@@ -1485,7 +1485,8 @@ def get_supplier_invoices(
     # Auto-update status to "vencida" for overdue invoices
     today = datetime.utcnow().date()
     for inv in invoices:
-        if inv.status in ["pendiente", "parcial"] and inv.due_date < today:
+        inv_due_date = inv.due_date.date() if hasattr(inv.due_date, 'date') else inv.due_date
+        if inv.status in ["pendiente", "parcial"] and inv_due_date < today:
             inv.status = "vencida"
             db.commit()
     
