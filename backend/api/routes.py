@@ -330,8 +330,10 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
             db.add(sale_item)
             
             if item_data.product_id:
-                product = db.query(Product).filter(Product.id == item_data.product_id).first()
+                product = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
                 if product:
+                    if product.quantity < item_data.quantity:
+                        raise HTTPException(status_code=400, detail=f"Stock insuficiente para {product.name}. Disponible: {product.quantity}")
                     old_qty = product.quantity
                     product.quantity -= item_data.quantity
                     
@@ -460,7 +462,7 @@ def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), curr
             db.add(return_item)
             
             if item_data.restock and sale_item.product_id:
-                product = db.query(Product).filter(Product.id == sale_item.product_id).first()
+                product = db.query(Product).filter(Product.id == sale_item.product_id).with_for_update().first()
                 if product:
                     old_qty = product.quantity
                     product.quantity += item_data.quantity
@@ -542,7 +544,7 @@ def create_product_transfer(
     from_product = db.query(Product).filter(
         Product.id == transfer_data.product_id,
         Product.store_id == transfer_data.from_store_id
-    ).first()
+    ).with_for_update().first()
     
     if not from_product:
         raise HTTPException(status_code=404, detail="Product not found in source store")
@@ -553,7 +555,7 @@ def create_product_transfer(
     to_product = db.query(Product).filter(
         Product.name == from_product.name,
         Product.store_id == transfer_data.to_store_id
-    ).first()
+    ).with_for_update().first()
     
     if not to_product:
         to_product = Product(
