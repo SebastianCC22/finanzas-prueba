@@ -43,14 +43,14 @@ export default function Inventario() {
   const [formData, setFormData] = useState<Partial<ProductCreate>>({
     name: "",
     sale_price: 0,
-    cost_price: 0,
+    cost: 0,
     has_iva: false,
     supplier: "",
     brand: "",
     quantity: 1,
     min_stock: 5,
     presentation: "unidad",
-    weight: "",
+    weight_volume: "",
   });
 
   useEffect(() => {
@@ -115,14 +115,14 @@ export default function Inventario() {
     setFormData({
       name: "",
       sale_price: 0,
-      cost_price: 0,
+      cost: 0,
       has_iva: false,
       supplier: "",
       brand: "",
       quantity: 1,
       min_stock: 5,
       presentation: "unidad",
-      weight: "",
+      weight_volume: "",
     });
     setIsProductDialogOpen(true);
   };
@@ -132,14 +132,14 @@ export default function Inventario() {
     setFormData({
       name: product.name,
       sale_price: product.sale_price,
-      cost_price: product.cost_price,
+      cost: product.cost || 0,
       has_iva: product.has_iva,
       supplier: product.supplier || "",
       brand: product.brand || "",
       quantity: product.quantity,
       min_stock: product.min_stock,
       presentation: product.presentation || "unidad",
-      weight: product.weight || "",
+      weight_volume: product.weight_volume || "",
     });
     setIsProductDialogOpen(true);
   };
@@ -428,7 +428,7 @@ export default function Inventario() {
                           Marca: <span className="font-medium text-foreground">{product.brand}</span>
                         </span>
                         <span>• Proveedor: {product.supplier}</span>
-                        {product.weight && <span>• {product.weight}</span>}
+                        {product.weight_volume && <span>• {product.weight_volume}</span>}
                       </div>
                       <div className="text-xs">
                         <span className="text-muted-foreground">Stock: </span>
@@ -444,7 +444,10 @@ export default function Inventario() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pl-14 sm:pl-0">
-                    <span className="font-bold font-mono text-lg">{formatCurrency(product.sale_price)}</span>
+                    <div className="text-right">
+                      <span className="font-bold font-mono text-lg block">{formatCurrency(product.sale_price)}</span>
+                      <span className="text-xs text-muted-foreground">Costo: {formatCurrency(product.cost || 0)}</span>
+                    </div>
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
@@ -526,8 +529,8 @@ export default function Inventario() {
                 <Label>Precio Costo</Label>
                 <Input
                   type="number"
-                  value={formData.cost_price}
-                  onChange={(e) => setFormData({ ...formData, cost_price: Number(e.target.value) })}
+                  value={formData.cost}
+                  onChange={(e) => setFormData({ ...formData, cost: Number(e.target.value) })}
                   placeholder="0"
                   data-testid="input-cost-price"
                 />
@@ -579,8 +582,8 @@ export default function Inventario() {
               <div className="space-y-2">
                 <Label>Peso/Volumen</Label>
                 <Input
-                  value={formData.weight}
-                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                  value={formData.weight_volume}
+                  onChange={(e) => setFormData({ ...formData, weight_volume: e.target.value })}
                   placeholder="Ej: 500ml"
                   data-testid="input-weight"
                 />
