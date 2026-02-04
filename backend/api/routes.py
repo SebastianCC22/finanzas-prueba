@@ -267,6 +267,65 @@ def delete_product(product_id: int, db: Session = Depends(get_db), current_user:
     db.commit()
     return {"message": "Product deleted successfully"}
 
+@router.get("/inventory/export")
+def export_inventory(
+    store_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller_or_admin)
+):
+    from decimal import Decimal
+    
+    effective_store_id = get_effective_store_id(current_user, store_id)
+    if effective_store_id:
+        validate_store_access(current_user, effective_store_id)
+    
+    query = db.query(Product).filter(Product.is_active == True)
+    
+    if effective_store_id:
+        query = query.filter(Product.store_id == effective_store_id)
+    elif current_user.role == "seller":
+        raise HTTPException(status_code=403, detail="Debe especificar una tienda")
+    
+    products = query.join(Store).order_by(Product.supplier, Product.name).all()
+    
+    data = []
+    for p in products:
+        data.append({
+            "codigo": p.id,
+            "nombre": p.name,
+            "categoria": p.presentation or "otros",
+            "stock_actual": p.quantity,
+            "stock_minimo": p.min_stock,
+            "precio_compra": float(p.cost) if p.cost else 0,
+            "precio_venta": float(p.sale_price) if p.sale_price else 0,
+            "tienda": p.store.name if p.store else "",
+            "estado": "Activo" if p.is_active else "Inactivo",
+            "ultima_actualizacion": p.updated_at.strftime("%Y-%m-%d %H:%M") if p.updated_at else ""
+        })
+    
+    headers = ["Código", "Nombre", "Categoría", "Stock Actual", "Stock Mínimo", 
+               "Precio Compra", "Precio Venta", "Tienda", "Estado", "Última Actualización"]
+    
+    excel_bytes = export_to_excel(data, headers, "Inventario")
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="EXPORT_INVENTORY",
+        entity_type="product",
+        entity_id=0,
+        new_values=f"Exportación de inventario - Tienda: {effective_store_id or 'Todas'}"
+    )
+    db.add(audit)
+    db.commit()
+    
+    filename = f"inventario_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @router.get("/products/{product_id}/movements", response_model=List[StockMovementResponse])
 def get_product_movements(product_id: int, db: Session = Depends(get_db)):
     movements = db.query(StockMovement).filter(

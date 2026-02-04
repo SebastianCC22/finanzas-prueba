@@ -200,10 +200,34 @@ export default function Inventario() {
     }
   };
 
-  const exportInventory = () => {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportInventory = async () => {
     if (!currentStore) return;
-    const url = api.getExportUrl("inventory", "excel", { store_id: currentStore.id.toString() });
-    window.open(url, "_blank");
+    setIsExporting(true);
+    try {
+      const blob = await api.exportInventory(currentStore.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inventario_${currentStore.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({
+        title: "Exportación completada",
+        description: "El archivo Excel se ha descargado correctamente",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error al exportar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -252,9 +276,23 @@ export default function Inventario() {
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportInventory} data-testid="button-export">
-            <Download className="h-4 w-4 mr-2" />
-            Exportar
+          <Button 
+            variant="outline" 
+            onClick={exportInventory} 
+            disabled={isExporting}
+            data-testid="button-export"
+          >
+            {isExporting ? (
+              <>
+                <div className="h-4 w-4 mr-2 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                Exportando...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Descargar Excel
+              </>
+            )}
           </Button>
           <Button onClick={handleAddNew} className="bg-amber-600 hover:bg-amber-700" data-testid="button-add">
             <Plus className="h-4 w-4 mr-2" />

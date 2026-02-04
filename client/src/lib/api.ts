@@ -108,6 +108,24 @@ class ApiClient {
     return this.request<Product[]>(`/products?${params}`);
   }
 
+  async exportInventory(storeId?: number): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (storeId) params.append('store_id', storeId.toString());
+    
+    const response = await fetch(`${this.baseUrl}/inventory/export?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Error al exportar' }));
+      throw new Error(error.detail || 'Error al exportar inventario');
+    }
+    
+    return response.blob();
+  }
+
   async getProduct(productId: number) {
     return this.request<Product>(`/products/${productId}`);
   }
