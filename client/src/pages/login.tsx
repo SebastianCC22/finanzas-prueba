@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Store as StoreIcon, Lock, Shield, MapPin, ArrowLeft, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import logoImage from "@/assets/logo.png";
 
 type LoginMode = "select" | "password";
 
@@ -148,9 +149,11 @@ export default function Login() {
         <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-200/60 overflow-hidden transition-all duration-300">
           <div className="px-8 pt-8 pb-6">
             <div className="flex items-center justify-center mb-6">
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center shadow-md">
-                <span className="text-white font-semibold text-sm tracking-tight">FR</span>
-              </div>
+              <img 
+                src={logoImage} 
+                alt="El Rincón Integral" 
+                className="h-20 w-auto object-contain"
+              />
             </div>
             
             <div className="text-center mb-1">
