@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -931,6 +932,8 @@ def update_cash_opening(
     db.refresh(opening)
     return opening
 
+CASH_CLOSING_DIFFERENCE_THRESHOLD = Decimal(os.environ.get("CASH_CLOSING_THRESHOLD", "50000"))
+
 @router.post("/cash-closings", response_model=CashClosingResponse)
 def create_cash_closing(
     closing_data: CashClosingCreate,
@@ -950,18 +953,21 @@ def create_cash_closing(
     
     total_sales = db.query(func.coalesce(func.sum(Sale.total), 0)).filter(
         Sale.store_id == closing_data.store_id,
+        Sale.deleted_at == None,
         Sale.created_at >= opening.opening_date,
         Sale.created_at <= datetime.now()
     ).scalar()
     
     total_expenses = db.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
         Expense.store_id == closing_data.store_id,
+        Expense.deleted_at == None,
         Expense.created_at >= opening.opening_date,
         Expense.created_at <= datetime.now()
     ).scalar()
     
     store_register_ids = db.query(CashRegister.id).filter(
-        CashRegister.store_id == closing_data.store_id
+        CashRegister.store_id == closing_data.store_id,
+        CashRegister.deleted_at == None
     ).subquery()
     
     total_transfers_in = db.query(func.coalesce(func.sum(CashTransfer.amount), 0)).filter(
@@ -976,15 +982,32 @@ def create_cash_closing(
         CashTransfer.created_at <= datetime.now()
     ).scalar()
     
+    total_refunds = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+        Payment.is_refund == True,
+        Payment.deleted_at == None,
+        Payment.cash_register_id.in_(store_register_ids),
+        Payment.created_at >= opening.opening_date,
+        Payment.created_at <= datetime.now()
+    ).scalar()
+    
     expected_balance = (
         Decimal(str(opening.initial_balance)) +
         Decimal(str(total_sales)) -
         Decimal(str(total_expenses)) +
         Decimal(str(total_transfers_in)) -
-        Decimal(str(total_transfers_out))
+        Decimal(str(total_transfers_out)) -
+        Decimal(str(total_refunds))
     )
     
     difference = Decimal(str(closing_data.actual_balance)) - expected_balance
+    
+    if abs(difference) > CASH_CLOSING_DIFFERENCE_THRESHOLD:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Diferencia de ${abs(difference):,.0f} excede el umbral permitido de ${CASH_CLOSING_DIFFERENCE_THRESHOLD:,.0f}. " +
+                   f"Balance esperado: ${expected_balance:,.0f}, Balance reportado: ${closing_data.actual_balance:,.0f}. " +
+                   "Revise las transacciones del día antes de cerrar."
+        )
     
     try:
         closing = CashClosing(
