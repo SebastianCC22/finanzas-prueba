@@ -97,6 +97,7 @@ class CashRegister(Base):
     register_type = Column(String(10), nullable=False)
     is_global = Column(Boolean, default=False)
     current_balance = Column(Numeric(15, 2), default=0)
+    deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     store = relationship("Store", back_populates="cash_registers")
@@ -158,6 +159,7 @@ class Sale(Base):
     total = Column(Numeric(15, 2), default=0)
     status = Column(String(20), default="completed")
     notes = Column(Text)
+    deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     store = relationship("Store", back_populates="sales")
@@ -196,6 +198,7 @@ class Payment(Base):
     payment_method = Column(String(20), nullable=False)
     amount = Column(Numeric(15, 2), nullable=False)
     is_refund = Column(Boolean, default=False)
+    deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     sale = relationship("Sale", back_populates="payments")
@@ -249,6 +252,7 @@ class Expense(Base):
     payment_method = Column(String(20), nullable=False)
     amount = Column(Numeric(15, 2), nullable=False)
     description = Column(Text, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class CashTransfer(Base):

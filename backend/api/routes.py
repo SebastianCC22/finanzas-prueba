@@ -145,7 +145,7 @@ def get_cash_registers(
     include_global: bool = True,
     db: Session = Depends(get_db)
 ):
-    query = db.query(CashRegister)
+    query = db.query(CashRegister).filter(CashRegister.deleted_at == None)
     if store_id:
         if include_global:
             query = query.filter(
@@ -411,7 +411,7 @@ def get_sales(
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Sale)
+    query = db.query(Sale).filter(Sale.deleted_at == None)
     
     if store_id:
         query = query.filter(Sale.store_id == store_id)
@@ -428,16 +428,16 @@ def get_sales(
 
 @router.get("/sales/{sale_id}", response_model=SaleResponse)
 def get_sale(sale_id: int, db: Session = Depends(get_db)):
-    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    sale = db.query(Sale).filter(Sale.id == sale_id, Sale.deleted_at == None).first()
     if not sale:
-        raise HTTPException(status_code=404, detail="Sale not found")
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
     return sale
 
 @router.post("/returns", response_model=ReturnResponse)
 def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    sale = db.query(Sale).filter(Sale.id == return_data.sale_id).first()
+    sale = db.query(Sale).filter(Sale.id == return_data.sale_id, Sale.deleted_at == None).first()
     if not sale:
-        raise HTTPException(status_code=404, detail="Sale not found")
+        raise HTTPException(status_code=404, detail="Venta no encontrada o eliminada")
     
     try:
         return_record = Return(
@@ -737,7 +737,7 @@ def get_expenses(
     end_date: Optional[datetime] = None,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Expense)
+    query = db.query(Expense).filter(Expense.deleted_at == None)
     
     if store_id:
         query = query.filter(Expense.store_id == store_id)
@@ -1835,15 +1835,112 @@ def delete_supplier_invoice(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
-    db_invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == invoice_id).first()
-    if not db_invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+    raise HTTPException(
+        status_code=403, 
+        detail="Eliminación permanente no permitida. Las facturas de proveedor son registros financieros permanentes."
+    )
+
+@router.delete("/sales/{sale_id}")
+def delete_sale(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    sale = db.query(Sale).filter(Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
     
-    db.query(InvoicePayment).filter(InvoicePayment.invoice_id == invoice_id).delete()
-    db.delete(db_invoice)
+    sale.deleted_at = datetime.now()
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="soft_delete_sale",
+        entity_type="sale",
+        entity_id=sale.id,
+        new_values=f"Venta {sale.sale_number} marcada como eliminada"
+    )
+    db.add(audit)
     db.commit()
     
-    return {"message": "Invoice deleted successfully"}
+    return {"message": "Venta eliminada correctamente"}
+
+@router.delete("/expenses/{expense_id}")
+def delete_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    
+    expense.deleted_at = datetime.now()
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="soft_delete_expense",
+        entity_type="expense",
+        entity_id=expense.id,
+        new_values=f"Gasto ${expense.amount} marcado como eliminado"
+    )
+    db.add(audit)
+    db.commit()
+    
+    return {"message": "Gasto eliminado correctamente"}
+
+@router.delete("/suppliers/{supplier_id}")
+def delete_supplier(
+    supplier_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    
+    supplier.is_active = False
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="soft_delete_supplier",
+        entity_type="supplier",
+        entity_id=supplier.id,
+        new_values=f"Proveedor {supplier.name} marcado como inactivo"
+    )
+    db.add(audit)
+    db.commit()
+    
+    return {"message": "Proveedor eliminado correctamente"}
+
+@router.delete("/cash-registers/{register_id}")
+def delete_cash_register(
+    register_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    register = db.query(CashRegister).filter(CashRegister.id == register_id).first()
+    if not register:
+        raise HTTPException(status_code=404, detail="Caja no encontrada")
+    
+    if register.current_balance != 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"No se puede eliminar la caja. Tiene un saldo de ${register.current_balance}"
+        )
+    
+    register.deleted_at = datetime.now()
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="soft_delete_cash_register",
+        entity_type="cash_register",
+        entity_id=register.id,
+        new_values=f"Caja {register.name} marcada como eliminada"
+    )
+    db.add(audit)
+    db.commit()
+    
+    return {"message": "Caja eliminada correctamente"}
 
 @router.post("/backups", response_model=BackupResponse)
 def create_manual_backup(
