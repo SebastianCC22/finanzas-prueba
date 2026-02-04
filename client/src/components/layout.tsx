@@ -90,21 +90,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Store className="h-3 w-3" />
             Tienda Activa
           </div>
-          <Select 
-            value={currentStore?.id?.toString() || ""} 
-            onValueChange={handleStoreChange}
-          >
-            <SelectTrigger className="bg-sidebar border-sidebar-border text-sidebar-foreground">
-              <SelectValue placeholder="Seleccionar tienda" />
-            </SelectTrigger>
-            <SelectContent>
-              {stores.map((store) => (
-                <SelectItem key={store.id} value={store.id.toString()}>
-                  {store.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {user?.role === 'admin' ? (
+            <Select 
+              value={currentStore?.id?.toString() || ""} 
+              onValueChange={handleStoreChange}
+            >
+              <SelectTrigger className="bg-sidebar border-sidebar-border text-sidebar-foreground">
+                <SelectValue placeholder="Seleccionar tienda" />
+              </SelectTrigger>
+              <SelectContent>
+                {stores.map((store) => (
+                  <SelectItem key={store.id} value={store.id.toString()}>
+                    {store.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="bg-sidebar border border-sidebar-border text-sidebar-foreground rounded-md px-3 py-2 text-sm">
+              {currentStore?.name || "Sin tienda asignada"}
+            </div>
+          )}
         </div>
       </div>
       

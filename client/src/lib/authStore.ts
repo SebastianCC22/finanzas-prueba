@@ -56,6 +56,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       setCurrentStore: (store: Store) => {
+        const { user } = get();
+        if (user?.role === 'seller' && user?.store_id) {
+          return;
+        }
         set({ currentStore: store });
       },
 
