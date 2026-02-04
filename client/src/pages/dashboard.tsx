@@ -268,9 +268,9 @@ export default function Dashboard() {
           </div>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
+        <div className="flex flex-col items-center justify-center min-h-screen -m-6 px-6 bg-slate-950">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-10 text-white shadow-xl shadow-emerald-500/20">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-500 p-10 text-white shadow-2xl shadow-emerald-500/30">
               <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
               <div className="relative">
@@ -290,20 +290,20 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 p-10 text-white shadow-xl shadow-slate-800/30">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-500 to-orange-500 p-10 text-white shadow-2xl shadow-rose-500/30">
               <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
               <div className="relative">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm mb-6">
                   <ArrowDownCircle className="h-6 w-6" />
                 </div>
-                <p className="text-slate-400 text-sm uppercase tracking-widest mb-3">
+                <p className="text-rose-100 text-sm uppercase tracking-widest mb-3">
                   Egresos del Día
                 </p>
                 <p className="text-5xl md:text-6xl font-semibold tracking-tight mb-4" data-testid="text-expenses-today">
                   {formatCurrency(stats?.total_expenses_today || 0)}
                 </p>
-                <div className="flex items-center gap-2 text-slate-400">
+                <div className="flex items-center gap-2 text-rose-100">
                   <Wallet className="h-4 w-4" />
                   <span className="text-sm">Gastos registrados</span>
                 </div>
