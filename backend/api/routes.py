@@ -292,6 +292,30 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
     sale_number = f"VTA-{today.strftime('%Y%m%d')}-{sale_count + 1:04d}"
     
     try:
+        products_to_update = {}
+        for item_data in sale_data.items:
+            if item_data.product_id:
+                product = db.query(Product).filter(
+                    Product.id == item_data.product_id,
+                    Product.is_active == True
+                ).with_for_update().first()
+                
+                if not product:
+                    raise HTTPException(status_code=404, detail=f"Producto ID {item_data.product_id} no encontrado o inactivo")
+                
+                pending_qty = products_to_update.get(item_data.product_id, {}).get('pending', 0)
+                total_requested = pending_qty + item_data.quantity
+                
+                if product.quantity < total_requested:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Stock insuficiente para {product.name}. Disponible: {product.quantity}, Solicitado: {total_requested}"
+                    )
+                
+                if item_data.product_id not in products_to_update:
+                    products_to_update[item_data.product_id] = {'product': product, 'pending': 0}
+                products_to_update[item_data.product_id]['pending'] = total_requested
+        
         subtotal = Decimal('0')
         tax_total = Decimal('0')
         discount_total = Decimal('0')
@@ -306,6 +330,8 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
         )
         db.add(sale)
         db.flush()
+        
+        stock_movements = []
         
         for item_data in sale_data.items:
             item_subtotal = Decimal(str(item_data.final_price)) * item_data.quantity
@@ -334,26 +360,25 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
             )
             db.add(sale_item)
             
-            if item_data.product_id:
-                product = db.query(Product).filter(Product.id == item_data.product_id).with_for_update().first()
-                if product:
-                    if product.quantity < item_data.quantity:
-                        raise HTTPException(status_code=400, detail=f"Stock insuficiente para {product.name}. Disponible: {product.quantity}")
-                    old_qty = product.quantity
-                    product.quantity -= item_data.quantity
-                    
-                    movement = StockMovement(
-                        product_id=product.id,
-                        user_id=current_user.id,
-                        movement_type="sale",
-                        quantity=-item_data.quantity,
-                        previous_quantity=old_qty,
-                        new_quantity=product.quantity,
-                        reason=f"Venta {sale_number}",
-                        reference_id=sale.id,
-                        reference_type="sale"
-                    )
-                    db.add(movement)
+            if item_data.product_id and item_data.product_id in products_to_update:
+                product = products_to_update[item_data.product_id]['product']
+                old_qty = product.quantity
+                product.quantity -= item_data.quantity
+                
+                stock_movements.append(StockMovement(
+                    product_id=product.id,
+                    user_id=current_user.id,
+                    movement_type="sale",
+                    quantity=-item_data.quantity,
+                    previous_quantity=old_qty,
+                    new_quantity=product.quantity,
+                    reason=f"Venta {sale_number}",
+                    reference_id=sale.id,
+                    reference_type="sale"
+                ))
+        
+        for movement in stock_movements:
+            db.add(movement)
         
         total = subtotal - Decimal(str(sale_data.global_discount))
         sale.subtotal = subtotal
