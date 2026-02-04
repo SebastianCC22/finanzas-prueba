@@ -269,35 +269,45 @@ export default function Dashboard() {
         </>
       ) : (
         <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 w-full max-w-4xl">
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 mb-6">
-                <ShoppingCart className="h-7 w-7 text-emerald-600" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-10 text-white shadow-xl shadow-emerald-500/20">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+              <div className="relative">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm mb-6">
+                  <ShoppingCart className="h-6 w-6" />
+                </div>
+                <p className="text-emerald-100 text-sm uppercase tracking-widest mb-3">
+                  Ventas del Día
+                </p>
+                <p className="text-5xl md:text-6xl font-semibold tracking-tight mb-4" data-testid="text-sales-today">
+                  {formatCurrency(stats?.total_sales_today || 0)}
+                </p>
+                <div className="flex items-center gap-2 text-emerald-100">
+                  <Receipt className="h-4 w-4" />
+                  <span className="text-sm">{stats?.sales_count_today || 0} transacciones</span>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground uppercase tracking-widest mb-4">
-                Ventas del Día
-              </p>
-              <p className="text-5xl md:text-6xl font-light text-foreground tracking-tight mb-3" data-testid="text-sales-today">
-                {formatCurrency(stats?.total_sales_today || 0)}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {stats?.sales_count_today || 0} transacciones
-              </p>
             </div>
 
-            <div className="text-center py-12 md:border-l md:border-border">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-rose-50 mb-6">
-                <ArrowDownCircle className="h-7 w-7 text-rose-500" />
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-800 to-slate-900 p-10 text-white shadow-xl shadow-slate-800/30">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+              <div className="relative">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm mb-6">
+                  <ArrowDownCircle className="h-6 w-6" />
+                </div>
+                <p className="text-slate-400 text-sm uppercase tracking-widest mb-3">
+                  Egresos del Día
+                </p>
+                <p className="text-5xl md:text-6xl font-semibold tracking-tight mb-4" data-testid="text-expenses-today">
+                  {formatCurrency(stats?.total_expenses_today || 0)}
+                </p>
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Wallet className="h-4 w-4" />
+                  <span className="text-sm">Gastos registrados</span>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground uppercase tracking-widest mb-4">
-                Egresos del Día
-              </p>
-              <p className="text-5xl md:text-6xl font-light text-foreground tracking-tight mb-3" data-testid="text-expenses-today">
-                {formatCurrency(stats?.total_expenses_today || 0)}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Gastos registrados
-              </p>
             </div>
           </div>
         </div>
