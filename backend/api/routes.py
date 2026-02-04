@@ -356,7 +356,14 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
         sale.discount_total = discount_total
         sale.total = total
         
-        total_payments = Decimal('0')
+        total_payments = sum(Decimal(str(p.amount)) for p in sale_data.payments)
+        
+        if total_payments < total:
+            raise HTTPException(status_code=400, detail="El pago no cubre el total de la venta")
+        
+        if total_payments > total:
+            raise HTTPException(status_code=400, detail=f"El pago (${total_payments}) excede el total de la venta (${total})")
+        
         for payment_data in sale_data.payments:
             payment = Payment(
                 sale_id=sale.id,
@@ -365,14 +372,10 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
                 amount=Decimal(str(payment_data.amount))
             )
             db.add(payment)
-            total_payments += Decimal(str(payment_data.amount))
             
-            register = db.query(CashRegister).filter(CashRegister.id == payment_data.cash_register_id).first()
+            register = db.query(CashRegister).filter(CashRegister.id == payment_data.cash_register_id).with_for_update().first()
             if register:
                 register.current_balance += Decimal(str(payment_data.amount))
-        
-        if total_payments < total:
-            raise HTTPException(status_code=400, detail="El pago no cubre el total de la venta")
         
         audit = AuditLog(
             user_id=current_user.id,
@@ -449,6 +452,17 @@ def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), curr
             if not sale_item:
                 raise HTTPException(status_code=404, detail=f"Sale item {item_data.sale_item_id} not found")
             
+            already_returned = db.query(func.coalesce(func.sum(ReturnItem.quantity), 0)).filter(
+                ReturnItem.sale_item_id == item_data.sale_item_id
+            ).scalar()
+            available_to_return = sale_item.quantity - int(already_returned)
+            
+            if item_data.quantity > available_to_return:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"La devolución ({item_data.quantity}) excede lo disponible ({available_to_return}) para el producto {sale_item.product_name}"
+                )
+            
             refund_amount = (sale_item.subtotal / sale_item.quantity) * item_data.quantity
             total_refund += refund_amount
             
@@ -494,8 +508,13 @@ def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), curr
             )
             db.add(refund_payment)
             
-            register = db.query(CashRegister).filter(CashRegister.id == payment.cash_register_id).first()
+            register = db.query(CashRegister).filter(CashRegister.id == payment.cash_register_id).with_for_update().first()
             if register:
+                if register.current_balance < refund_amount:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Saldo insuficiente en {register.name} (${register.current_balance}) para reembolso de ${refund_amount}"
+                    )
                 register.current_balance -= refund_amount
         
         audit = AuditLog(
@@ -662,34 +681,50 @@ def get_product_transfers(
 
 @router.post("/expenses", response_model=ExpenseResponse)
 def create_expense(expense_data: ExpenseCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    expense = Expense(
-        store_id=expense_data.store_id,
-        user_id=current_user.id,
-        cash_register_id=expense_data.cash_register_id,
-        payment_method=expense_data.payment_method.value,
-        amount=Decimal(str(expense_data.amount)),
-        description=expense_data.description
-    )
-    db.add(expense)
+    register = db.query(CashRegister).filter(CashRegister.id == expense_data.cash_register_id).with_for_update().first()
+    if not register:
+        raise HTTPException(status_code=404, detail="Caja no encontrada")
     
-    register = db.query(CashRegister).filter(CashRegister.id == expense_data.cash_register_id).first()
-    if register:
-        register.current_balance -= Decimal(str(expense_data.amount))
+    expense_amount = Decimal(str(expense_data.amount))
+    if register.current_balance < expense_amount:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Saldo insuficiente en {register.name} (${register.current_balance}) para gasto de ${expense_amount}"
+        )
     
-    db.commit()
-    db.refresh(expense)
-    
-    audit = AuditLog(
-        user_id=current_user.id,
-        action="create_expense",
-        entity_type="expense",
-        entity_id=expense.id,
-        new_values=f"Expense: ${expense_data.amount} - {expense_data.description}"
-    )
-    db.add(audit)
-    db.commit()
-    
-    return expense
+    try:
+        expense = Expense(
+            store_id=expense_data.store_id,
+            user_id=current_user.id,
+            cash_register_id=expense_data.cash_register_id,
+            payment_method=expense_data.payment_method.value,
+            amount=expense_amount,
+            description=expense_data.description
+        )
+        db.add(expense)
+        
+        register.current_balance -= expense_amount
+        
+        db.flush()
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="create_expense",
+            entity_type="expense",
+            entity_id=expense.id,
+            new_values=f"Expense: ${expense_data.amount} - {expense_data.description}"
+        )
+        db.add(audit)
+        
+        db.commit()
+        db.refresh(expense)
+        return expense
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear el gasto: {str(e)}")
 
 @router.get("/expenses", response_model=List[ExpenseResponse])
 def get_expenses(
@@ -715,14 +750,18 @@ def create_cash_transfer(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from_register = db.query(CashRegister).filter(CashRegister.id == transfer_data.from_register_id).first()
-    to_register = db.query(CashRegister).filter(CashRegister.id == transfer_data.to_register_id).first()
+    from_register = db.query(CashRegister).filter(CashRegister.id == transfer_data.from_register_id).with_for_update().first()
+    to_register = db.query(CashRegister).filter(CashRegister.id == transfer_data.to_register_id).with_for_update().first()
     
     if not from_register or not to_register:
-        raise HTTPException(status_code=404, detail="Cash register not found")
+        raise HTTPException(status_code=404, detail="Caja no encontrada")
     
-    if from_register.current_balance < Decimal(str(transfer_data.amount)):
-        raise HTTPException(status_code=400, detail="Insufficient funds in source register")
+    transfer_amount = Decimal(str(transfer_data.amount))
+    if from_register.current_balance < transfer_amount:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Saldo insuficiente en {from_register.name} (${from_register.current_balance}) para transferencia de ${transfer_amount}"
+        )
     
     if from_register.payment_method == "efectivo" and to_register.payment_method == "efectivo":
         if from_register.store_id != to_register.store_id and not from_register.is_global and not to_register.is_global:
@@ -896,7 +935,10 @@ def create_cash_closing(
 ):
     opening = db.query(CashOpening).filter(CashOpening.id == closing_data.opening_id).first()
     if not opening:
-        raise HTTPException(status_code=404, detail="Opening not found")
+        raise HTTPException(status_code=404, detail="No se encontró la apertura de caja especificada")
+    
+    if opening.store_id != closing_data.store_id:
+        raise HTTPException(status_code=400, detail="La apertura no corresponde a esta tienda")
     
     existing = db.query(CashClosing).filter(CashClosing.opening_id == closing_data.opening_id).first()
     if existing:
