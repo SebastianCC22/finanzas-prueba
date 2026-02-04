@@ -19,9 +19,12 @@ from backend.api.routes import router
 from backend.services.auth import get_password_hash
 from backend.services.backup_service import create_backup, cleanup_old_backups
 from backend.services.logging_service import setup_logging, log_error, log_critical
+from backend.services.config import validate_environment, ADMIN_DEFAULT_PASSWORD, SELLER_DEFAULT_PASSWORD
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+validate_environment()
 
 scheduler = BackgroundScheduler()
 
@@ -52,20 +55,20 @@ async def lifespan(app: FastAPI):
             admin = User(
                 username="Administrador",
                 email="admin@example.com",
-                password_hash=get_password_hash("Rarerimolero71"),
+                password_hash=get_password_hash(ADMIN_DEFAULT_PASSWORD),
                 full_name="Administrador",
                 role="admin"
             )
             db.add(admin)
             db.commit()
-            print("Default admin user created: Administrador")
+            logger.info("Usuario admin por defecto creado: Administrador")
         
         cajero = db.query(User).filter(User.username == "Cajero").first()
         if not cajero:
             cajero = User(
                 username="Cajero",
                 email="cajero@example.com",
-                password_hash=get_password_hash("1234"),
+                password_hash=get_password_hash(SELLER_DEFAULT_PASSWORD),
                 full_name="Cajero",
                 role="seller"
             )
