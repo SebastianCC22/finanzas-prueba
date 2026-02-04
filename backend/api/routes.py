@@ -581,69 +581,86 @@ def create_product_transfer(
         Product.store_id == transfer_data.to_store_id
     ).with_for_update().first()
     
-    if not to_product:
-        to_product = Product(
-            store_id=transfer_data.to_store_id,
-            name=from_product.name,
-            brand=from_product.brand,
-            supplier=from_product.supplier,
-            sale_price=from_product.sale_price,
-            cost=from_product.cost,
-            has_iva=from_product.has_iva,
-            quantity=0,
-            presentation=from_product.presentation,
-            weight_volume=from_product.weight_volume,
-            expiration_date=from_product.expiration_date,
-            min_stock=from_product.min_stock
+    try:
+        if not to_product:
+            to_product = Product(
+                store_id=transfer_data.to_store_id,
+                name=from_product.name,
+                brand=from_product.brand,
+                supplier=from_product.supplier,
+                sale_price=from_product.sale_price,
+                cost=from_product.cost,
+                has_iva=from_product.has_iva,
+                quantity=0,
+                presentation=from_product.presentation,
+                weight_volume=from_product.weight_volume,
+                expiration_date=from_product.expiration_date,
+                min_stock=from_product.min_stock
+            )
+            db.add(to_product)
+            db.flush()
+        
+        transfer = ProductTransfer(
+            product_id=transfer_data.product_id,
+            from_store_id=transfer_data.from_store_id,
+            to_store_id=transfer_data.to_store_id,
+            user_id=current_user.id,
+            quantity=transfer_data.quantity,
+            reason=transfer_data.reason
         )
-        db.add(to_product)
+        db.add(transfer)
         db.flush()
-    
-    transfer = ProductTransfer(
-        product_id=transfer_data.product_id,
-        from_store_id=transfer_data.from_store_id,
-        to_store_id=transfer_data.to_store_id,
-        user_id=current_user.id,
-        quantity=transfer_data.quantity,
-        reason=transfer_data.reason
-    )
-    db.add(transfer)
-    
-    old_from_qty = from_product.quantity
-    from_product.quantity -= transfer_data.quantity
-    
-    movement_out = StockMovement(
-        product_id=from_product.id,
-        user_id=current_user.id,
-        movement_type="transfer_out",
-        quantity=-transfer_data.quantity,
-        previous_quantity=old_from_qty,
-        new_quantity=from_product.quantity,
-        reason=f"Traspaso a tienda destino",
-        reference_id=transfer.id,
-        reference_type="product_transfer"
-    )
-    db.add(movement_out)
-    
-    old_to_qty = to_product.quantity
-    to_product.quantity += transfer_data.quantity
-    
-    movement_in = StockMovement(
-        product_id=to_product.id,
-        user_id=current_user.id,
-        movement_type="transfer_in",
-        quantity=transfer_data.quantity,
-        previous_quantity=old_to_qty,
-        new_quantity=to_product.quantity,
-        reason=f"Traspaso desde tienda origen",
-        reference_id=transfer.id,
-        reference_type="product_transfer"
-    )
-    db.add(movement_in)
-    
-    db.commit()
-    db.refresh(transfer)
-    return transfer
+        
+        old_from_qty = from_product.quantity
+        from_product.quantity -= transfer_data.quantity
+        
+        movement_out = StockMovement(
+            product_id=from_product.id,
+            user_id=current_user.id,
+            movement_type="transfer_out",
+            quantity=-transfer_data.quantity,
+            previous_quantity=old_from_qty,
+            new_quantity=from_product.quantity,
+            reason=f"Traspaso a tienda destino",
+            reference_id=transfer.id,
+            reference_type="product_transfer"
+        )
+        db.add(movement_out)
+        
+        old_to_qty = to_product.quantity
+        to_product.quantity += transfer_data.quantity
+        
+        movement_in = StockMovement(
+            product_id=to_product.id,
+            user_id=current_user.id,
+            movement_type="transfer_in",
+            quantity=transfer_data.quantity,
+            previous_quantity=old_to_qty,
+            new_quantity=to_product.quantity,
+            reason=f"Traspaso desde tienda origen",
+            reference_id=transfer.id,
+            reference_type="product_transfer"
+        )
+        db.add(movement_in)
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="create_product_transfer",
+            entity_type="product_transfer",
+            entity_id=transfer.id,
+            new_values=f"Transfer {transfer_data.quantity} units of {from_product.name} between stores"
+        )
+        db.add(audit)
+        
+        db.commit()
+        db.refresh(transfer)
+        return transfer
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al procesar transferencia de inventario: {str(e)}")
 
 @router.get("/product-transfers", response_model=List[ProductTransferResponse])
 def get_product_transfers(
@@ -1066,36 +1083,39 @@ def update_cash_closing(
     closing_id: int,
     update_data: CashClosingUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     closing = db.query(CashClosing).filter(CashClosing.id == closing_id).first()
     if not closing:
         raise HTTPException(status_code=404, detail="Cierre no encontrado")
     
-    opening = db.query(CashOpening).filter(CashOpening.id == closing.opening_id).first()
-    
-    if update_data.actual_balance is not None:
-        new_actual = Decimal(str(update_data.actual_balance))
-        closing.actual_balance = new_actual
-        closing.difference = new_actual - closing.expected_balance
-    
-    if update_data.notes is not None:
-        closing.notes = update_data.notes
-    
-    db.commit()
-    db.refresh(closing)
-    
-    audit = AuditLog(
-        user_id=current_user.id,
-        action="update_cash_closing",
-        entity_type="cash_closing",
-        entity_id=closing.id,
-        new_values=f"Updated: balance={update_data.actual_balance}, notes={update_data.notes}"
-    )
-    db.add(audit)
-    db.commit()
-    
-    return closing
+    try:
+        if update_data.actual_balance is not None:
+            new_actual = Decimal(str(update_data.actual_balance))
+            closing.actual_balance = new_actual
+            closing.difference = new_actual - closing.expected_balance
+        
+        if update_data.notes is not None:
+            closing.notes = update_data.notes
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="update_cash_closing",
+            entity_type="cash_closing",
+            entity_id=closing.id,
+            new_values=f"Updated: balance={update_data.actual_balance}, notes={update_data.notes}"
+        )
+        db.add(audit)
+        
+        db.commit()
+        db.refresh(closing)
+        return closing
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al actualizar cierre: {str(e)}")
 
 @router.get("/alerts", response_model=List[AlertResponse])
 def get_alerts(
