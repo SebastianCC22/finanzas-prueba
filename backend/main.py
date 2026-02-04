@@ -1,17 +1,42 @@
 import os
 import zipfile
 import io
+import logging
 from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 from contextlib import asynccontextmanager
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+import pytz
 
 from backend.models.database import engine, Base, SessionLocal
 from backend.models.models import User, Store, CashRegister
 from backend.api.routes import router
 from backend.services.auth import get_password_hash
+from backend.services.backup_service import create_backup, cleanup_old_backups
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+scheduler = BackgroundScheduler()
+
+def run_automatic_backup():
+    db = SessionLocal()
+    try:
+        logger.info("Iniciando backup automático diario...")
+        backup = create_backup(db, user_id=None, backup_type="automatic")
+        logger.info(f"Backup automático completado: {backup.filename}")
+        
+        deleted = cleanup_old_backups(db, keep_count=30)
+        if deleted > 0:
+            logger.info(f"Limpieza: {deleted} backups antiguos eliminados")
+    except Exception as e:
+        logger.error(f"Error en backup automático: {str(e)}")
+    finally:
+        db.close()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -91,7 +116,19 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     
+    bogota_tz = pytz.timezone("America/Bogota")
+    scheduler.add_job(
+        run_automatic_backup,
+        CronTrigger(hour=2, minute=0, timezone=bogota_tz),
+        id="daily_backup",
+        replace_existing=True
+    )
+    scheduler.start()
+    logger.info("Scheduler de backups automáticos iniciado (2:00 AM hora Colombia)")
+    
     yield
+    
+    scheduler.shutdown()
 
 app = FastAPI(
     title="Finanzas Rincon Integral API",

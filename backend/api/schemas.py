@@ -514,3 +514,34 @@ class SupplierInvoiceSummary(BaseModel):
     invoices_pending_count: int
     invoices_overdue_count: int
     invoices_due_soon_count: int
+
+class BackupType(str, Enum):
+    MANUAL = "manual"
+    AUTOMATIC = "automatic"
+
+class BackupStatus(str, Enum):
+    SUCCESS = "success"
+    FAILED = "failed"
+    IN_PROGRESS = "in_progress"
+
+class BackupCreate(BaseModel):
+    backup_type: BackupType = BackupType.MANUAL
+
+class BackupResponse(BaseModel):
+    id: int
+    filename: str
+    filepath: str
+    backup_type: str
+    status: str
+    file_size: Optional[int]
+    user_id: Optional[int]
+    error_message: Optional[str]
+    created_at: datetime
+    username: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class BackupListResponse(BaseModel):
+    backups: List[BackupResponse]
+    total: int

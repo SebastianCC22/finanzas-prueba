@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi.responses import FileResponse
+from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from typing import List, Optional
@@ -11,7 +13,7 @@ from backend.models.models import (
     Sale, SaleItem, Payment, Return, ReturnItem,
     ProductTransfer, Expense, CashTransfer,
     CashOpening, CashClosing, Alert, AuditLog,
-    Supplier, SupplierInvoice, InvoicePayment
+    Supplier, SupplierInvoice, InvoicePayment, Backup
 )
 from backend.api.schemas import (
     UserCreate, UserResponse, UserLogin, Token,
@@ -29,8 +31,10 @@ from backend.api.schemas import (
     PaymentMethodStats, StoreStats, TopProduct, AdvancedStats,
     SupplierCreate, SupplierUpdate, SupplierResponse,
     SupplierInvoiceCreate, SupplierInvoiceUpdate, SupplierInvoiceResponse,
-    InvoicePaymentCreate, InvoicePaymentResponse, SupplierInvoiceSummary
+    InvoicePaymentCreate, InvoicePaymentResponse, SupplierInvoiceSummary,
+    BackupCreate, BackupResponse, BackupListResponse
 )
+from backend.services.backup_service import create_backup, get_latest_backup, get_all_backups
 from backend.services.auth import (
     get_password_hash, verify_password, create_access_token,
     get_current_user, require_admin
@@ -1840,3 +1844,153 @@ def delete_supplier_invoice(
     db.commit()
     
     return {"message": "Invoice deleted successfully"}
+
+@router.post("/backups", response_model=BackupResponse)
+def create_manual_backup(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    try:
+        backup = create_backup(db, user_id=current_user.id, backup_type="manual")
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="create_backup",
+            entity_type="backup",
+            entity_id=backup.id,
+            new_values=f"Backup manual: {backup.filename}"
+        )
+        db.add(audit)
+        db.commit()
+        
+        return BackupResponse(
+            id=backup.id,
+            filename=backup.filename,
+            filepath=backup.filepath,
+            backup_type=backup.backup_type,
+            status=backup.status,
+            file_size=backup.file_size,
+            user_id=backup.user_id,
+            error_message=backup.error_message,
+            created_at=backup.created_at,
+            username=current_user.username
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/backups", response_model=BackupListResponse)
+def list_backups(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    backups, total = get_all_backups(db, skip=skip, limit=limit)
+    
+    backup_responses = []
+    for backup in backups:
+        user = db.query(User).filter(User.id == backup.user_id).first() if backup.user_id else None
+        backup_responses.append(BackupResponse(
+            id=backup.id,
+            filename=backup.filename,
+            filepath=backup.filepath,
+            backup_type=backup.backup_type,
+            status=backup.status,
+            file_size=backup.file_size,
+            user_id=backup.user_id,
+            error_message=backup.error_message,
+            created_at=backup.created_at,
+            username=user.username if user else None
+        ))
+    
+    return BackupListResponse(backups=backup_responses, total=total)
+
+@router.get("/backups/latest", response_model=BackupResponse)
+def get_latest_backup_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    backup = get_latest_backup(db)
+    if not backup:
+        raise HTTPException(status_code=404, detail="No hay backups exitosos disponibles")
+    
+    user = db.query(User).filter(User.id == backup.user_id).first() if backup.user_id else None
+    return BackupResponse(
+        id=backup.id,
+        filename=backup.filename,
+        filepath=backup.filepath,
+        backup_type=backup.backup_type,
+        status=backup.status,
+        file_size=backup.file_size,
+        user_id=backup.user_id,
+        error_message=backup.error_message,
+        created_at=backup.created_at,
+        username=user.username if user else None
+    )
+
+@router.get("/backups/download/latest")
+def download_latest_backup(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    backup = get_latest_backup(db)
+    if not backup:
+        raise HTTPException(status_code=404, detail="No hay backups exitosos disponibles")
+    
+    if backup.status != "success":
+        raise HTTPException(status_code=400, detail="El último backup no está disponible para descarga")
+    
+    filepath = Path(backup.filepath)
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Archivo de backup no encontrado en disco")
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="download_backup",
+        entity_type="backup",
+        entity_id=backup.id,
+        new_values=f"Descarga: {backup.filename}"
+    )
+    db.add(audit)
+    db.commit()
+    
+    return FileResponse(
+        path=str(filepath),
+        filename=backup.filename,
+        media_type="application/gzip"
+    )
+
+@router.get("/backups/{backup_id}/download")
+def download_backup_by_id(
+    backup_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    backup = db.query(Backup).filter(Backup.id == backup_id).first()
+    if not backup:
+        raise HTTPException(status_code=404, detail="Backup no encontrado")
+    
+    if backup.status != "success":
+        raise HTTPException(status_code=400, detail="El backup no está disponible para descarga")
+    
+    filepath = Path(backup.filepath)
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Archivo de backup no encontrado en disco")
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="download_backup",
+        entity_type="backup",
+        entity_id=backup.id,
+        new_values=f"Descarga: {backup.filename}"
+    )
+    db.add(audit)
+    db.commit()
+    
+    return FileResponse(
+        path=str(filepath),
+        filename=backup.filename,
+        media_type="application/gzip"
+    )

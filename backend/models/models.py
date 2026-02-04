@@ -326,18 +326,6 @@ class AuditLog(Base):
     
     user = relationship("User", back_populates="audit_logs")
 
-class Backup(Base):
-    __tablename__ = "backups"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String(255), nullable=False)
-    file_path = Column(String(500))
-    file_size = Column(Integer)
-    backup_type = Column(String(20))
-    cloud_url = Column(String(500))
-    status = Column(String(20), default="pending")
-    created_at = Column(DateTime, default=datetime.utcnow)
-
 class Supplier(Base):
     __tablename__ = "suppliers"
     
@@ -387,3 +375,18 @@ class InvoicePayment(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     invoice = relationship("SupplierInvoice", back_populates="payments")
+
+class Backup(Base):
+    __tablename__ = "backups"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255), nullable=False)
+    filepath = Column(String(500), nullable=False)
+    backup_type = Column(String(20), default="manual")
+    status = Column(String(20), default="in_progress")
+    file_size = Column(Integer)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User")
