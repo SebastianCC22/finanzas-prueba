@@ -1,0 +1,156 @@
+Estoy desarrollando un sistema POS con FastAPI + SQLAlchemy + frontend web.
+Necesito crear un módulo de PROGRAMACIÓN DE PAGOS A PROVEEDORES, inspirado en una hoja de Excel, pero totalmente integrado al sistema.
+
+OBJETIVO GENERAL
+
+Dentro del módulo PROVEEDORES, crear un apartado llamado:
+
+👉 “Programación de Pagos”
+
+Que permita planear, visualizar y controlar qué facturas están:
+
+Pagadas
+
+Pendientes
+
+Parcialmente pagadas (abonos)
+
+Cuánto falta por pagar
+
+Todo por semana o rango de fechas, como contabilidad real.
+
+BACKEND (OBLIGATORIO)
+1. Nueva entidad: PaymentSchedule
+class PaymentSchedule(Base):
+    __tablename__ = "payment_schedules"
+
+    id = Column(Integer, primary_key=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"))
+    supplier_invoice_id = Column(Integer, ForeignKey("supplier_invoices.id"))
+
+    invoice_due_date = Column(Date)
+    invoice_number = Column(String)
+    invoice_amount = Column(Numeric(12,2))
+
+    payment_type = Column(String)  # TOTAL | ABONO
+    paid_amount = Column(Numeric(12,2), default=0)
+    pending_amount = Column(Numeric(12,2))
+
+    status = Column(String)  # PAGADA | PENDIENTE | PARCIAL
+
+    week_start = Column(Date)
+    week_end = Column(Date)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+2. Lógica automática
+
+pending_amount = invoice_amount - paid_amount
+
+Si pending_amount == 0 → status = PAGADA
+
+Si paid_amount > 0 → status = PARCIAL
+
+Si paid_amount == 0 → status = PENDIENTE
+
+3. Endpoints necesarios
+
+POST /payment-schedule
+
+GET /payment-schedule?week_start=&week_end=
+
+PUT /payment-schedule/{id} (registrar abonos)
+
+GET /payment-schedule/summary
+
+4. Endpoint resumen (como el Excel)
+
+Debe devolver:
+
+{
+  "total_programado": 4995538,
+  "total_pagado": 856350,
+  "total_pendiente": 1460188,
+  "por_proveedor": [
+    {
+      "proveedor": "VARIEDADES EL 47",
+      "pagado": 416250,
+      "pendiente": 0
+    }
+  ]
+}
+
+FRONTEND (OBLIGATORIO)
+5. Nueva pestaña en PROVEEDORES
+
+📁 Programación de Pagos
+
+6. Vista tipo Excel (tabla)
+
+Columnas EXACTAS:
+
+Proveedor
+
+Venc. Factura
+
+Nº Factura
+
+Monto Factura
+
+Tipo de Pago (TOTAL / ABONO)
+
+Monto Pagado
+
+Estado (PAGADA / PARCIAL / PENDIENTE)
+
+7. Funcionalidades visuales
+
+Selector de semana o rango de fechas
+
+Colores:
+
+🟢 Pagada
+
+🟡 Parcial
+
+🔴 Pendiente
+
+Fila editable para registrar abonos
+
+Totales automáticos abajo:
+
+Total Pagado
+
+Total Pendiente
+
+Falta
+
+8. Reglas de acceso
+
+Admin: crear, editar, pagar
+
+Cajero: solo ver
+
+EXTRAS IMPORTANTES
+
+Integrar con SupplierInvoice
+
+Cada pago debe generar:
+
+Movimiento de caja
+
+Registro en AuditLog
+
+Exportar a Excel con el mismo formato visual
+
+RESULTADO FINAL
+
+Un sistema que:
+
+Reemplaza Excel
+
+Sirve para control semanal real
+
+Es válido para contabilidad
+
+Escala a producción sin rehacer nada

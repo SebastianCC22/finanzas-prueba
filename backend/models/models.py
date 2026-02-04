@@ -387,6 +387,51 @@ class InvoicePayment(Base):
     
     invoice = relationship("SupplierInvoice", back_populates="payments")
 
+class PaymentScheduleStatus(str, enum.Enum):
+    PAGADA = "pagada"
+    PARCIAL = "parcial"
+    PENDIENTE = "pendiente"
+
+class PaymentScheduleType(str, enum.Enum):
+    TOTAL = "total"
+    ABONO = "abono"
+
+class PaymentSchedule(Base):
+    __tablename__ = "payment_schedules"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
+    supplier_invoice_id = Column(Integer, ForeignKey("supplier_invoices.id"), nullable=False)
+    
+    invoice_due_date = Column(DateTime, nullable=False)
+    invoice_number = Column(String(100), nullable=False)
+    invoice_amount = Column(Numeric(15, 2), nullable=False)
+    
+    payment_type = Column(String(20), default="total")
+    paid_amount = Column(Numeric(15, 2), default=0)
+    pending_amount = Column(Numeric(15, 2), nullable=False)
+    
+    status = Column(String(20), default="pendiente")
+    
+    week_start = Column(DateTime, nullable=False)
+    week_end = Column(DateTime, nullable=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    supplier = relationship("Supplier")
+    invoice = relationship("SupplierInvoice")
+    
+    def update_status(self):
+        self.pending_amount = float(self.invoice_amount) - float(self.paid_amount)
+        if self.pending_amount <= 0:
+            self.status = PaymentScheduleStatus.PAGADA.value
+            self.pending_amount = 0
+        elif float(self.paid_amount) > 0:
+            self.status = PaymentScheduleStatus.PARCIAL.value
+        else:
+            self.status = PaymentScheduleStatus.PENDIENTE.value
+
 class Backup(Base):
     __tablename__ = "backups"
     

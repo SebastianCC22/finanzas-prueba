@@ -550,3 +550,59 @@ class BackupResponse(BaseModel):
 class BackupListResponse(BaseModel):
     backups: List[BackupResponse]
     total: int
+
+class PaymentScheduleStatus(str, Enum):
+    PAGADA = "pagada"
+    PARCIAL = "parcial"
+    PENDIENTE = "pendiente"
+
+class PaymentScheduleType(str, Enum):
+    TOTAL = "total"
+    ABONO = "abono"
+
+class PaymentScheduleCreate(BaseModel):
+    supplier_invoice_id: int
+    payment_type: str = "total"
+    week_start: datetime
+    week_end: datetime
+
+class PaymentScheduleUpdate(BaseModel):
+    payment_type: Optional[str] = None
+    week_start: Optional[datetime] = None
+    week_end: Optional[datetime] = None
+
+class PaymentSchedulePayment(BaseModel):
+    amount: float
+    payment_method: str = "efectivo"
+    notes: Optional[str] = None
+
+class PaymentScheduleResponse(BaseModel):
+    id: int
+    supplier_id: int
+    supplier_invoice_id: int
+    invoice_due_date: datetime
+    invoice_number: str
+    invoice_amount: float
+    payment_type: str
+    paid_amount: float
+    pending_amount: float
+    status: str
+    week_start: datetime
+    week_end: datetime
+    created_at: datetime
+    updated_at: datetime
+    supplier_name: str = ""
+
+    class Config:
+        from_attributes = True
+
+class SupplierPaymentSummary(BaseModel):
+    proveedor: str
+    pagado: float
+    pendiente: float
+
+class PaymentScheduleSummary(BaseModel):
+    total_programado: float
+    total_pagado: float
+    total_pendiente: float
+    por_proveedor: List[SupplierPaymentSummary]

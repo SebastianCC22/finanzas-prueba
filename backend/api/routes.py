@@ -16,7 +16,8 @@ from backend.models.models import (
     Sale, SaleItem, Payment, Return, ReturnItem,
     ProductTransfer, Expense, CashTransfer,
     CashOpening, CashClosing, Alert, AuditLog,
-    Supplier, SupplierInvoice, InvoicePayment, Backup
+    Supplier, SupplierInvoice, InvoicePayment, Backup,
+    PaymentSchedule
 )
 from backend.api.schemas import (
     UserCreate, UserResponse, UserLogin, Token,
@@ -35,7 +36,9 @@ from backend.api.schemas import (
     SupplierCreate, SupplierUpdate, SupplierResponse,
     SupplierInvoiceCreate, SupplierInvoiceUpdate, SupplierInvoiceResponse,
     InvoicePaymentCreate, InvoicePaymentResponse, SupplierInvoiceSummary,
-    BackupCreate, BackupResponse, BackupListResponse
+    BackupCreate, BackupResponse, BackupListResponse,
+    PaymentScheduleCreate, PaymentScheduleUpdate, PaymentScheduleResponse,
+    PaymentSchedulePayment, PaymentScheduleSummary, SupplierPaymentSummary
 )
 from backend.services.backup_service import create_backup, get_latest_backup, get_all_backups
 from backend.services.auth import (
@@ -2578,3 +2581,344 @@ def rebuild_all(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error en reconstrucción: {str(e)}")
+
+@router.get("/payment-schedule", response_model=List[PaymentScheduleResponse])
+def get_payment_schedules(
+    week_start: Optional[datetime] = None,
+    week_end: Optional[datetime] = None,
+    supplier_id: Optional[int] = None,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_viewer_or_above)
+):
+    query = db.query(PaymentSchedule)
+    
+    if week_start:
+        query = query.filter(PaymentSchedule.week_start >= week_start)
+    if week_end:
+        query = query.filter(PaymentSchedule.week_end <= week_end)
+    if supplier_id:
+        query = query.filter(PaymentSchedule.supplier_id == supplier_id)
+    if status:
+        query = query.filter(PaymentSchedule.status == status)
+    
+    schedules = query.order_by(PaymentSchedule.invoice_due_date).all()
+    
+    result = []
+    for schedule in schedules:
+        supplier = db.query(Supplier).filter(Supplier.id == schedule.supplier_id).first()
+        result.append(PaymentScheduleResponse(
+            id=schedule.id,
+            supplier_id=schedule.supplier_id,
+            supplier_invoice_id=schedule.supplier_invoice_id,
+            invoice_due_date=schedule.invoice_due_date,
+            invoice_number=schedule.invoice_number,
+            invoice_amount=float(schedule.invoice_amount),
+            payment_type=schedule.payment_type,
+            paid_amount=float(schedule.paid_amount),
+            pending_amount=float(schedule.pending_amount),
+            status=schedule.status,
+            week_start=schedule.week_start,
+            week_end=schedule.week_end,
+            created_at=schedule.created_at,
+            updated_at=schedule.updated_at,
+            supplier_name=supplier.name if supplier else ""
+        ))
+    
+    return result
+
+@router.post("/payment-schedule", response_model=PaymentScheduleResponse)
+def create_payment_schedule(
+    data: PaymentScheduleCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == data.supplier_invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    
+    existing = db.query(PaymentSchedule).filter(
+        PaymentSchedule.supplier_invoice_id == data.supplier_invoice_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Esta factura ya está programada")
+    
+    supplier = db.query(Supplier).filter(Supplier.id == invoice.supplier_id).first()
+    
+    schedule = PaymentSchedule(
+        supplier_id=invoice.supplier_id,
+        supplier_invoice_id=invoice.id,
+        invoice_due_date=invoice.due_date,
+        invoice_number=invoice.invoice_number,
+        invoice_amount=invoice.total_amount,
+        payment_type=data.payment_type,
+        paid_amount=invoice.paid_amount or 0,
+        pending_amount=float(invoice.total_amount) - float(invoice.paid_amount or 0),
+        week_start=data.week_start,
+        week_end=data.week_end
+    )
+    schedule.update_status()
+    
+    db.add(schedule)
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="create_payment_schedule",
+        entity_type="payment_schedule",
+        entity_id=schedule.id,
+        new_values=f"Programación creada para factura {invoice.invoice_number}"
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(schedule)
+    
+    return PaymentScheduleResponse(
+        id=schedule.id,
+        supplier_id=schedule.supplier_id,
+        supplier_invoice_id=schedule.supplier_invoice_id,
+        invoice_due_date=schedule.invoice_due_date,
+        invoice_number=schedule.invoice_number,
+        invoice_amount=float(schedule.invoice_amount),
+        payment_type=schedule.payment_type,
+        paid_amount=float(schedule.paid_amount),
+        pending_amount=float(schedule.pending_amount),
+        status=schedule.status,
+        week_start=schedule.week_start,
+        week_end=schedule.week_end,
+        created_at=schedule.created_at,
+        updated_at=schedule.updated_at,
+        supplier_name=supplier.name if supplier else ""
+    )
+
+@router.put("/payment-schedule/{schedule_id}", response_model=PaymentScheduleResponse)
+def update_payment_schedule(
+    schedule_id: int,
+    data: PaymentScheduleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    schedule = db.query(PaymentSchedule).filter(PaymentSchedule.id == schedule_id).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Programación no encontrada")
+    
+    old_values = f"payment_type={schedule.payment_type}, week_start={schedule.week_start}, week_end={schedule.week_end}"
+    
+    if data.payment_type is not None:
+        schedule.payment_type = data.payment_type
+    if data.week_start is not None:
+        schedule.week_start = data.week_start
+    if data.week_end is not None:
+        schedule.week_end = data.week_end
+    
+    new_values = f"payment_type={schedule.payment_type}, week_start={schedule.week_start}, week_end={schedule.week_end}"
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="update_payment_schedule",
+        entity_type="payment_schedule",
+        entity_id=schedule.id,
+        old_values=old_values,
+        new_values=new_values
+    )
+    db.add(audit)
+    
+    db.commit()
+    db.refresh(schedule)
+    
+    supplier = db.query(Supplier).filter(Supplier.id == schedule.supplier_id).first()
+    
+    return PaymentScheduleResponse(
+        id=schedule.id,
+        supplier_id=schedule.supplier_id,
+        supplier_invoice_id=schedule.supplier_invoice_id,
+        invoice_due_date=schedule.invoice_due_date,
+        invoice_number=schedule.invoice_number,
+        invoice_amount=float(schedule.invoice_amount),
+        payment_type=schedule.payment_type,
+        paid_amount=float(schedule.paid_amount),
+        pending_amount=float(schedule.pending_amount),
+        status=schedule.status,
+        week_start=schedule.week_start,
+        week_end=schedule.week_end,
+        created_at=schedule.created_at,
+        updated_at=schedule.updated_at,
+        supplier_name=supplier.name if supplier else ""
+    )
+
+@router.post("/payment-schedule/{schedule_id}/pay", response_model=PaymentScheduleResponse)
+def register_schedule_payment(
+    schedule_id: int,
+    data: PaymentSchedulePayment,
+    store_id: int = Query(..., description="ID de la tienda para el movimiento de caja"),
+    cash_register_id: Optional[int] = Query(None, description="ID de la caja para descontar el pago"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    schedule = db.query(PaymentSchedule).filter(PaymentSchedule.id == schedule_id).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Programación no encontrada")
+    
+    if schedule.status == "pagada":
+        raise HTTPException(status_code=400, detail="Esta programación ya está pagada")
+    
+    if data.amount > float(schedule.pending_amount):
+        raise HTTPException(status_code=400, detail="El monto excede el saldo pendiente")
+    
+    invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == schedule.supplier_invoice_id).first()
+    supplier = db.query(Supplier).filter(Supplier.id == schedule.supplier_id).first()
+    
+    if invoice:
+        new_payment = InvoicePayment(
+            invoice_id=invoice.id,
+            amount=Decimal(str(data.amount)),
+            payment_method=data.payment_method,
+            notes=data.notes or f"Pago programado #{schedule_id}"
+        )
+        db.add(new_payment)
+        
+        invoice.paid_amount = (invoice.paid_amount or 0) + Decimal(str(data.amount))
+        if float(invoice.paid_amount) >= float(invoice.total_amount):
+            invoice.status = "pagada"
+        elif float(invoice.paid_amount) > 0:
+            invoice.status = "parcial"
+    
+    if cash_register_id:
+        cash_register = db.query(CashRegister).filter(
+            CashRegister.id == cash_register_id,
+            CashRegister.deleted_at.is_(None)
+        ).first()
+        
+        if not cash_register:
+            raise HTTPException(status_code=404, detail="Caja no encontrada")
+        
+        if cash_register.store_id and cash_register.store_id != store_id and not cash_register.is_global:
+            raise HTTPException(status_code=400, detail="La caja no pertenece a esta tienda")
+        
+        supplier_name = supplier.name if supplier else "Proveedor"
+        expense = Expense(
+            store_id=store_id,
+            user_id=current_user.id,
+            cash_register_id=cash_register_id,
+            payment_method=data.payment_method,
+            amount=Decimal(str(data.amount)),
+            description=f"Pago a proveedor: {supplier_name} - Factura {schedule.invoice_number}"
+        )
+        db.add(expense)
+        db.flush()
+        
+        cash_register.current_balance = (cash_register.current_balance or 0) - Decimal(str(data.amount))
+        
+        cash_audit = AuditLog(
+            user_id=current_user.id,
+            action="supplier_payment_expense",
+            entity_type="expense",
+            entity_id=expense.id,
+            new_values=f"Pago a proveedor ${data.amount} desde caja {cash_register.name} - Factura {schedule.invoice_number}"
+        )
+        db.add(cash_audit)
+    
+    schedule.paid_amount = Decimal(str(float(schedule.paid_amount) + data.amount))
+    schedule.update_status()
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="payment_schedule_payment",
+        entity_type="payment_schedule",
+        entity_id=schedule.id,
+        new_values=f"Abono de ${data.amount} registrado. Método: {data.payment_method}"
+    )
+    db.add(audit)
+    
+    db.commit()
+    db.refresh(schedule)
+    
+    supplier = db.query(Supplier).filter(Supplier.id == schedule.supplier_id).first()
+    
+    return PaymentScheduleResponse(
+        id=schedule.id,
+        supplier_id=schedule.supplier_id,
+        supplier_invoice_id=schedule.supplier_invoice_id,
+        invoice_due_date=schedule.invoice_due_date,
+        invoice_number=schedule.invoice_number,
+        invoice_amount=float(schedule.invoice_amount),
+        payment_type=schedule.payment_type,
+        paid_amount=float(schedule.paid_amount),
+        pending_amount=float(schedule.pending_amount),
+        status=schedule.status,
+        week_start=schedule.week_start,
+        week_end=schedule.week_end,
+        created_at=schedule.created_at,
+        updated_at=schedule.updated_at,
+        supplier_name=supplier.name if supplier else ""
+    )
+
+@router.get("/payment-schedule/summary", response_model=PaymentScheduleSummary)
+def get_payment_schedule_summary(
+    week_start: Optional[datetime] = None,
+    week_end: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_viewer_or_above)
+):
+    query = db.query(PaymentSchedule)
+    
+    if week_start:
+        query = query.filter(PaymentSchedule.week_start >= week_start)
+    if week_end:
+        query = query.filter(PaymentSchedule.week_end <= week_end)
+    
+    schedules = query.all()
+    
+    total_programado = sum(float(s.invoice_amount) for s in schedules)
+    total_pagado = sum(float(s.paid_amount) for s in schedules)
+    total_pendiente = sum(float(s.pending_amount) for s in schedules)
+    
+    supplier_totals = {}
+    for schedule in schedules:
+        supplier = db.query(Supplier).filter(Supplier.id == schedule.supplier_id).first()
+        supplier_name = supplier.name if supplier else "Desconocido"
+        
+        if supplier_name not in supplier_totals:
+            supplier_totals[supplier_name] = {"pagado": 0, "pendiente": 0}
+        
+        supplier_totals[supplier_name]["pagado"] += float(schedule.paid_amount)
+        supplier_totals[supplier_name]["pendiente"] += float(schedule.pending_amount)
+    
+    por_proveedor = [
+        SupplierPaymentSummary(
+            proveedor=name,
+            pagado=totals["pagado"],
+            pendiente=totals["pendiente"]
+        )
+        for name, totals in supplier_totals.items()
+    ]
+    
+    return PaymentScheduleSummary(
+        total_programado=total_programado,
+        total_pagado=total_pagado,
+        total_pendiente=total_pendiente,
+        por_proveedor=por_proveedor
+    )
+
+@router.delete("/payment-schedule/{schedule_id}")
+def delete_payment_schedule(
+    schedule_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    schedule = db.query(PaymentSchedule).filter(PaymentSchedule.id == schedule_id).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Programación no encontrada")
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="delete_payment_schedule",
+        entity_type="payment_schedule",
+        entity_id=schedule.id,
+        new_values=f"Programación eliminada para factura {schedule.invoice_number}"
+    )
+    db.add(audit)
+    
+    db.delete(schedule)
+    db.commit()
+    
+    return {"message": "Programación eliminada correctamente"}

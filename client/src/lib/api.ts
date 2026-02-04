@@ -426,6 +426,67 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  async getPaymentSchedules(filters?: {
+    week_start?: string;
+    week_end?: string;
+    supplier_id?: number;
+    status?: string;
+  }): Promise<PaymentSchedule[]> {
+    const params = new URLSearchParams();
+    if (filters?.week_start) params.append('week_start', filters.week_start);
+    if (filters?.week_end) params.append('week_end', filters.week_end);
+    if (filters?.supplier_id) params.append('supplier_id', filters.supplier_id.toString());
+    if (filters?.status) params.append('status', filters.status);
+    const query = params.toString();
+    return this.request<PaymentSchedule[]>(`/payment-schedule${query ? `?${query}` : ''}`);
+  }
+
+  async createPaymentSchedule(data: PaymentScheduleCreate): Promise<PaymentSchedule> {
+    return this.request<PaymentSchedule>('/payment-schedule', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePaymentSchedule(id: number, data: PaymentScheduleUpdate): Promise<PaymentSchedule> {
+    return this.request<PaymentSchedule>(`/payment-schedule/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async registerSchedulePayment(
+    id: number, 
+    data: PaymentSchedulePayment,
+    storeId: number,
+    cashRegisterId?: number
+  ): Promise<PaymentSchedule> {
+    const params = new URLSearchParams();
+    params.append('store_id', storeId.toString());
+    if (cashRegisterId) params.append('cash_register_id', cashRegisterId.toString());
+    return this.request<PaymentSchedule>(`/payment-schedule/${id}/pay?${params.toString()}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPaymentScheduleSummary(filters?: {
+    week_start?: string;
+    week_end?: string;
+  }): Promise<PaymentScheduleSummary> {
+    const params = new URLSearchParams();
+    if (filters?.week_start) params.append('week_start', filters.week_start);
+    if (filters?.week_end) params.append('week_end', filters.week_end);
+    const query = params.toString();
+    return this.request<PaymentScheduleSummary>(`/payment-schedule/summary${query ? `?${query}` : ''}`);
+  }
+
+  async deletePaymentSchedule(id: number): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/payment-schedule/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const api = new ApiClient();
@@ -924,4 +985,55 @@ export interface SupplierInvoiceSummary {
   invoices_pending_count: number;
   invoices_overdue_count: number;
   invoices_due_soon_count: number;
+}
+
+export interface PaymentSchedule {
+  id: number;
+  supplier_id: number;
+  supplier_invoice_id: number;
+  invoice_due_date: string;
+  invoice_number: string;
+  invoice_amount: number;
+  payment_type: string;
+  paid_amount: number;
+  pending_amount: number;
+  status: string;
+  week_start: string;
+  week_end: string;
+  created_at: string;
+  updated_at: string;
+  supplier_name: string;
+}
+
+export interface PaymentScheduleCreate {
+  supplier_invoice_id: number;
+  payment_type?: string;
+  week_start: string;
+  week_end: string;
+}
+
+export interface PaymentScheduleUpdate {
+  payment_type?: string;
+  paid_amount?: number;
+  week_start?: string;
+  week_end?: string;
+}
+
+export interface PaymentSchedulePayment {
+  amount: number;
+  payment_method?: string;
+  notes?: string;
+}
+
+export interface SupplierPaymentSummary {
+  proveedor: string;
+  pagado: number;
+  pendiente: number;
+}
+
+export interface PaymentScheduleSummary {
+  total_programado: number;
+  total_pagado: number;
+  total_pendiente: number;
+  por_proveedor: SupplierPaymentSummary[];
 }

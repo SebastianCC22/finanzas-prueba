@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "@/lib/authStore";
-import { api, Supplier, SupplierCreate, SupplierInvoice, SupplierInvoiceCreate, SupplierInvoiceSummary, InvoicePaymentCreate } from "@/lib/api";
+import { api, Supplier, SupplierCreate, SupplierInvoice, SupplierInvoiceCreate, SupplierInvoiceSummary, InvoicePaymentCreate, PaymentSchedule, PaymentScheduleCreate, PaymentSchedulePayment, PaymentScheduleSummary, CashRegister } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +87,27 @@ export default function Proveedores() {
   
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [schedules, setSchedules] = useState<PaymentSchedule[]>([]);
+  const [scheduleSummary, setScheduleSummary] = useState<PaymentScheduleSummary | null>(null);
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay());
+    return d.toISOString().split('T')[0];
+  });
+  const [weekEnd, setWeekEnd] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay() + 6);
+    return d.toISOString().split('T')[0];
+  });
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [selectedInvoiceForSchedule, setSelectedInvoiceForSchedule] = useState<number | null>(null);
+  const [showPaymentScheduleDialog, setShowPaymentScheduleDialog] = useState(false);
+  const [selectedScheduleForPayment, setSelectedScheduleForPayment] = useState<PaymentSchedule | null>(null);
+  const [schedulePaymentAmount, setSchedulePaymentAmount] = useState(0);
+  const [schedulePaymentMethod, setSchedulePaymentMethod] = useState("efectivo");
+  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
+  const [selectedCashRegisterId, setSelectedCashRegisterId] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -94,14 +115,24 @@ export default function Proveedores() {
 
   const loadData = async () => {
     try {
-      const [suppliersData, invoicesData, summaryData] = await Promise.all([
+      const requests: Promise<any>[] = [
         api.getSuppliers(false),
         api.getSupplierInvoices(),
         api.getInvoiceSummary(),
-      ]);
-      setSuppliers(suppliersData);
-      setInvoices(invoicesData);
-      setSummary(summaryData);
+      ];
+      if (user?.store_id) {
+        requests.push(api.getCashRegisters(user.store_id));
+      }
+      const results = await Promise.all(requests);
+      setSuppliers(results[0]);
+      setInvoices(results[1]);
+      setSummary(results[2]);
+      if (results[3]) {
+        setCashRegisters(results[3]);
+        if (results[3].length > 0 && !selectedCashRegisterId) {
+          setSelectedCashRegisterId(results[3][0].id);
+        }
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -268,6 +299,99 @@ export default function Proveedores() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
+
+  const loadSchedules = async () => {
+    try {
+      const [schedulesData, summaryData] = await Promise.all([
+        api.getPaymentSchedules({ week_start: weekStart, week_end: weekEnd }),
+        api.getPaymentScheduleSummary({ week_start: weekStart, week_end: weekEnd })
+      ]);
+      setSchedules(schedulesData);
+      setScheduleSummary(summaryData);
+    } catch (error: any) {
+      console.error("Error loading schedules:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadSchedules();
+  }, [weekStart, weekEnd]);
+
+  const handleCreateSchedule = async () => {
+    if (!selectedInvoiceForSchedule) return;
+    
+    try {
+      await api.createPaymentSchedule({
+        supplier_invoice_id: selectedInvoiceForSchedule,
+        payment_type: "total",
+        week_start: weekStart,
+        week_end: weekEnd
+      });
+      toast({ title: "Factura programada exitosamente" });
+      setShowScheduleDialog(false);
+      setSelectedInvoiceForSchedule(null);
+      loadSchedules();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleSchedulePayment = async () => {
+    if (!selectedScheduleForPayment || schedulePaymentAmount <= 0) return;
+    
+    if (!user?.store_id) {
+      toast({ title: "Error", description: "No se ha seleccionado una tienda", variant: "destructive" });
+      return;
+    }
+    
+    try {
+      await api.registerSchedulePayment(
+        selectedScheduleForPayment.id, 
+        {
+          amount: schedulePaymentAmount,
+          payment_method: schedulePaymentMethod,
+          notes: ""
+        },
+        user.store_id,
+        selectedCashRegisterId || undefined
+      );
+      toast({ title: "Abono registrado exitosamente" });
+      setShowPaymentScheduleDialog(false);
+      setSelectedScheduleForPayment(null);
+      setSchedulePaymentAmount(0);
+      loadSchedules();
+      loadData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteSchedule = async (id: number) => {
+    if (!confirm("¿Está seguro de eliminar esta programación?")) return;
+    try {
+      await api.deletePaymentSchedule(id);
+      toast({ title: "Programación eliminada" });
+      loadSchedules();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const getScheduleStatusBadge = (status: string) => {
+    switch (status) {
+      case "pagada":
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Pagada</Badge>;
+      case "parcial":
+        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" />Parcial</Badge>;
+      default:
+        return <Badge className="bg-red-100 text-red-800"><AlertCircle className="h-3 w-3 mr-1" />Pendiente</Badge>;
+    }
+  };
+
+  const unscheduledInvoices = invoices.filter(inv => 
+    inv.status !== "pagada" && inv.status !== "cancelada" &&
+    !schedules.some(s => s.supplier_invoice_id === inv.id)
+  );
 
   const filteredInvoices = invoices.filter(inv => {
     if (statusFilter !== "all" && inv.status !== statusFilter) return false;
@@ -521,6 +645,7 @@ export default function Proveedores() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="facturas">Facturas</TabsTrigger>
+          <TabsTrigger value="programacion">Programación de Pagos</TabsTrigger>
           <TabsTrigger value="proveedores">Proveedores</TabsTrigger>
         </TabsList>
 
@@ -640,6 +765,215 @@ export default function Proveedores() {
                   })
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="programacion" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Programación Semanal de Pagos
+                  </CardTitle>
+                  <CardDescription>Control de pagos a proveedores por semana</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Semana:</Label>
+                  <Input
+                    type="date"
+                    value={weekStart}
+                    onChange={(e) => setWeekStart(e.target.value)}
+                    className="w-36"
+                    data-testid="input-week-start"
+                  />
+                  <span className="text-sm">a</span>
+                  <Input
+                    type="date"
+                    value={weekEnd}
+                    onChange={(e) => setWeekEnd(e.target.value)}
+                    className="w-36"
+                    data-testid="input-week-end"
+                  />
+                  {user?.role === 'admin' && (
+                    <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" data-testid="button-add-schedule">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Programar Factura
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Programar Factura para Pago</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Factura Pendiente</Label>
+                            <Select
+                              value={selectedInvoiceForSchedule?.toString() || ""}
+                              onValueChange={(v) => setSelectedInvoiceForSchedule(parseInt(v))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar factura" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {unscheduledInvoices.map((inv) => (
+                                  <SelectItem key={inv.id} value={inv.id.toString()}>
+                                    {inv.invoice_number} - {inv.supplier_name} ({formatCurrency(inv.remaining_amount)})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            La factura se programará para la semana: {format(parseISO(weekStart), "dd/MM", { locale: es })} - {format(parseISO(weekEnd), "dd/MM/yyyy", { locale: es })}
+                          </p>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setShowScheduleDialog(false)}>Cancelar</Button>
+                          <Button onClick={handleCreateSchedule} disabled={!selectedInvoiceForSchedule}>Programar</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {scheduleSummary && (
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <Card className="bg-blue-50 dark:bg-blue-950/20">
+                    <CardContent className="pt-4">
+                      <p className="text-sm text-muted-foreground">Total Programado</p>
+                      <p className="text-2xl font-bold font-mono">{formatCurrency(scheduleSummary.total_programado)}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-green-50 dark:bg-green-950/20">
+                    <CardContent className="pt-4">
+                      <p className="text-sm text-muted-foreground">Total Pagado</p>
+                      <p className="text-2xl font-bold font-mono text-green-600">{formatCurrency(scheduleSummary.total_pagado)}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-red-50 dark:bg-red-950/20">
+                    <CardContent className="pt-4">
+                      <p className="text-sm text-muted-foreground">Total Pendiente</p>
+                      <p className="text-2xl font-bold font-mono text-red-600">{formatCurrency(scheduleSummary.total_pendiente)}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse" data-testid="table-payment-schedule">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium">Proveedor</th>
+                      <th className="text-left p-3 font-medium">Venc. Factura</th>
+                      <th className="text-left p-3 font-medium">Nº Factura</th>
+                      <th className="text-right p-3 font-medium">Monto Factura</th>
+                      <th className="text-center p-3 font-medium">Tipo Pago</th>
+                      <th className="text-right p-3 font-medium">Monto Pagado</th>
+                      <th className="text-right p-3 font-medium">Pendiente</th>
+                      <th className="text-center p-3 font-medium">Estado</th>
+                      <th className="text-center p-3 font-medium">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {schedules.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="text-center py-8 text-muted-foreground">
+                          No hay facturas programadas para esta semana
+                        </td>
+                      </tr>
+                    ) : (
+                      schedules.map((schedule) => (
+                        <tr 
+                          key={schedule.id} 
+                          className={cn(
+                            "border-b hover:bg-muted/30 transition-colors",
+                            schedule.status === "pagada" && "bg-green-50 dark:bg-green-950/10",
+                            schedule.status === "parcial" && "bg-yellow-50 dark:bg-yellow-950/10",
+                            schedule.status === "pendiente" && "bg-red-50 dark:bg-red-950/10"
+                          )}
+                          data-testid={`row-schedule-${schedule.id}`}
+                        >
+                          <td className="p-3 font-medium">{schedule.supplier_name}</td>
+                          <td className="p-3">{format(parseISO(schedule.invoice_due_date), "dd/MM/yyyy", { locale: es })}</td>
+                          <td className="p-3">{schedule.invoice_number}</td>
+                          <td className="p-3 text-right font-mono">{formatCurrency(schedule.invoice_amount)}</td>
+                          <td className="p-3 text-center">
+                            <Badge variant="outline">{schedule.payment_type.toUpperCase()}</Badge>
+                          </td>
+                          <td className="p-3 text-right font-mono text-green-600">{formatCurrency(schedule.paid_amount)}</td>
+                          <td className="p-3 text-right font-mono text-red-600">{formatCurrency(schedule.pending_amount)}</td>
+                          <td className="p-3 text-center">{getScheduleStatusBadge(schedule.status)}</td>
+                          <td className="p-3 text-center">
+                            <div className="flex justify-center gap-1">
+                              {user?.role === 'admin' && schedule.status !== "pagada" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedScheduleForPayment(schedule);
+                                    setSchedulePaymentAmount(schedule.pending_amount);
+                                    setShowPaymentScheduleDialog(true);
+                                  }}
+                                  data-testid={`button-pay-schedule-${schedule.id}`}
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {user?.role === 'admin' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-500 hover:text-red-600"
+                                  onClick={() => handleDeleteSchedule(schedule.id)}
+                                  data-testid={`button-delete-schedule-${schedule.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {schedules.length > 0 && (
+                    <tfoot className="bg-muted/50 font-medium">
+                      <tr>
+                        <td colSpan={3} className="p-3">TOTALES</td>
+                        <td className="p-3 text-right font-mono">{formatCurrency(scheduleSummary?.total_programado || 0)}</td>
+                        <td></td>
+                        <td className="p-3 text-right font-mono text-green-600">{formatCurrency(scheduleSummary?.total_pagado || 0)}</td>
+                        <td className="p-3 text-right font-mono text-red-600">{formatCurrency(scheduleSummary?.total_pendiente || 0)}</td>
+                        <td colSpan={2}></td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+
+              {scheduleSummary && scheduleSummary.por_proveedor.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-medium mb-3">Resumen por Proveedor</h4>
+                  <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                    {scheduleSummary.por_proveedor.map((sp, idx) => (
+                      <Card key={idx} className="p-3">
+                        <p className="font-medium">{sp.proveedor}</p>
+                        <div className="flex justify-between text-sm mt-1">
+                          <span className="text-green-600">Pagado: {formatCurrency(sp.pagado)}</span>
+                          <span className="text-red-600">Pendiente: {formatCurrency(sp.pendiente)}</span>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -905,6 +1239,90 @@ export default function Proveedores() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPaymentScheduleDialog} onOpenChange={setShowPaymentScheduleDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Abono</DialogTitle>
+          </DialogHeader>
+          {selectedScheduleForPayment && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Factura</p>
+                <p className="font-medium">{selectedScheduleForPayment.invoice_number}</p>
+                <p className="text-sm">{selectedScheduleForPayment.supplier_name}</p>
+                <div className="mt-2 pt-2 border-t">
+                  <div className="flex justify-between text-sm">
+                    <span>Total:</span>
+                    <span className="font-mono">{formatCurrency(selectedScheduleForPayment.invoice_amount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>Pendiente:</span>
+                    <span className="font-mono">{formatCurrency(selectedScheduleForPayment.pending_amount)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Monto a Abonar *</Label>
+                <Input
+                  type="number"
+                  value={schedulePaymentAmount || ""}
+                  onChange={(e) => setSchedulePaymentAmount(parseFloat(e.target.value) || 0)}
+                  max={selectedScheduleForPayment.pending_amount}
+                  data-testid="input-schedule-payment-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Método de Pago</Label>
+                <Select value={schedulePaymentMethod} onValueChange={setSchedulePaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="efectivo">Efectivo</SelectItem>
+                    <SelectItem value="transferencia">Transferencia</SelectItem>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {cashRegisters.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Descontar de Caja (opcional)</Label>
+                  <Select 
+                    value={selectedCashRegisterId?.toString() || ""} 
+                    onValueChange={(v) => setSelectedCashRegisterId(v ? parseInt(v) : null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar caja" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Sin descontar de caja</SelectItem>
+                      {cashRegisters.map((cr) => (
+                        <SelectItem key={cr.id} value={cr.id.toString()}>
+                          {cr.name} ({formatCurrency(cr.current_balance)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Si selecciona una caja, el pago se registrará como egreso y se descontará del saldo.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentScheduleDialog(false)}>Cancelar</Button>
+            <Button 
+              onClick={handleSchedulePayment} 
+              disabled={schedulePaymentAmount <= 0}
+              data-testid="button-confirm-schedule-payment"
+            >
+              Registrar Abono
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
