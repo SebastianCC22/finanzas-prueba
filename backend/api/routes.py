@@ -2163,3 +2163,214 @@ def download_backup_by_id(
         filename=backup.filename,
         media_type="application/gzip"
     )
+
+@router.post("/admin/rebuild-balances")
+def rebuild_balances(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    try:
+        cash_registers = db.query(CashRegister).filter(CashRegister.deleted_at == None).all()
+        register_results = []
+        
+        for register in cash_registers:
+            old_balance = register.current_balance or Decimal('0')
+            
+            payments_in = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+                Payment.cash_register_id == register.id,
+                Payment.is_refund == False,
+                Payment.deleted_at == None
+            ).scalar()
+            
+            refunds_out = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+                Payment.cash_register_id == register.id,
+                Payment.is_refund == True,
+                Payment.deleted_at == None
+            ).scalar()
+            
+            expenses_out = db.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
+                Expense.cash_register_id == register.id,
+                Expense.deleted_at == None
+            ).scalar()
+            
+            transfers_in = db.query(func.coalesce(func.sum(CashTransfer.amount), 0)).filter(
+                CashTransfer.to_register_id == register.id
+            ).scalar()
+            
+            transfers_out = db.query(func.coalesce(func.sum(CashTransfer.amount), 0)).filter(
+                CashTransfer.from_register_id == register.id
+            ).scalar()
+            
+            calculated_balance = (
+                Decimal(str(payments_in)) -
+                Decimal(str(refunds_out)) -
+                Decimal(str(expenses_out)) +
+                Decimal(str(transfers_in)) -
+                Decimal(str(transfers_out))
+            )
+            
+            register.current_balance = calculated_balance
+            
+            register_results.append({
+                "register_id": register.id,
+                "register_name": register.name,
+                "old_balance": float(old_balance),
+                "new_balance": float(calculated_balance),
+                "difference": float(calculated_balance - old_balance)
+            })
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="rebuild_cash_balances",
+            entity_type="system",
+            entity_id=0,
+            new_values=f"Reconstrucción de {len(cash_registers)} cajas"
+        )
+        db.add(audit)
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": f"Balances de {len(cash_registers)} cajas reconstruidos",
+            "registers": register_results
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al reconstruir balances: {str(e)}")
+
+@router.post("/admin/rebuild-inventory")
+def rebuild_inventory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    try:
+        products = db.query(Product).filter(Product.is_active == True).all()
+        product_results = []
+        
+        for product in products:
+            old_quantity = product.quantity or 0
+            
+            total_movements = db.query(func.coalesce(func.sum(StockMovement.quantity), 0)).filter(
+                StockMovement.product_id == product.id
+            ).scalar()
+            
+            calculated_quantity = int(total_movements)
+            if calculated_quantity < 0:
+                calculated_quantity = 0
+            
+            product.quantity = calculated_quantity
+            
+            if old_quantity != calculated_quantity:
+                product_results.append({
+                    "product_id": product.id,
+                    "product_name": product.name,
+                    "old_quantity": old_quantity,
+                    "new_quantity": calculated_quantity,
+                    "difference": calculated_quantity - old_quantity
+                })
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="rebuild_inventory",
+            entity_type="system",
+            entity_id=0,
+            new_values=f"Reconstrucción: {len(products)} productos, {len(product_results)} ajustados"
+        )
+        db.add(audit)
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": f"Inventario reconstruido: {len(products)} productos, {len(product_results)} ajustados",
+            "adjusted_products": product_results
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al reconstruir inventario: {str(e)}")
+
+@router.post("/admin/rebuild-all")
+def rebuild_all(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    try:
+        cash_registers = db.query(CashRegister).filter(CashRegister.deleted_at == None).all()
+        register_adjustments = 0
+        
+        for register in cash_registers:
+            old_balance = register.current_balance or Decimal('0')
+            
+            payments_in = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+                Payment.cash_register_id == register.id,
+                Payment.is_refund == False,
+                Payment.deleted_at == None
+            ).scalar()
+            
+            refunds_out = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+                Payment.cash_register_id == register.id,
+                Payment.is_refund == True,
+                Payment.deleted_at == None
+            ).scalar()
+            
+            expenses_out = db.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
+                Expense.cash_register_id == register.id,
+                Expense.deleted_at == None
+            ).scalar()
+            
+            transfers_in = db.query(func.coalesce(func.sum(CashTransfer.amount), 0)).filter(
+                CashTransfer.to_register_id == register.id
+            ).scalar()
+            
+            transfers_out = db.query(func.coalesce(func.sum(CashTransfer.amount), 0)).filter(
+                CashTransfer.from_register_id == register.id
+            ).scalar()
+            
+            calculated_balance = (
+                Decimal(str(payments_in)) -
+                Decimal(str(refunds_out)) -
+                Decimal(str(expenses_out)) +
+                Decimal(str(transfers_in)) -
+                Decimal(str(transfers_out))
+            )
+            
+            if old_balance != calculated_balance:
+                register_adjustments += 1
+            register.current_balance = calculated_balance
+        
+        products = db.query(Product).filter(Product.is_active == True).all()
+        inventory_adjustments = 0
+        
+        for product in products:
+            old_quantity = product.quantity or 0
+            
+            total_movements = db.query(func.coalesce(func.sum(StockMovement.quantity), 0)).filter(
+                StockMovement.product_id == product.id
+            ).scalar()
+            
+            calculated_quantity = max(0, int(total_movements))
+            
+            if old_quantity != calculated_quantity:
+                inventory_adjustments += 1
+            product.quantity = calculated_quantity
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="rebuild_all",
+            entity_type="system",
+            entity_id=0,
+            new_values=f"Reconstrucción completa: {register_adjustments} cajas, {inventory_adjustments} productos"
+        )
+        db.add(audit)
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": "Reconstrucción completa exitosa",
+            "cash_registers_reviewed": len(cash_registers),
+            "cash_registers_adjusted": register_adjustments,
+            "products_reviewed": len(products),
+            "products_adjusted": inventory_adjustments
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error en reconstrucción: {str(e)}")
