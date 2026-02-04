@@ -75,8 +75,8 @@ async def lifespan(app: FastAPI):
         
         stores = db.query(Store).all()
         if not stores:
-            store_tunal = Store(name="Tunal", address="Centro Comercial Tunal")
-            store_20 = Store(name="20 de Julio", address="Barrio 20 de Julio")
+            store_tunal = Store(name="Tunal", code="TUN", address="Centro Comercial Tunal", sale_sequence=0)
+            store_20 = Store(name="20 de Julio", code="20J", address="Barrio 20 de Julio", sale_sequence=0)
             db.add(store_tunal)
             db.add(store_20)
             db.commit()

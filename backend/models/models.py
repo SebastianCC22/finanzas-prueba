@@ -76,9 +76,11 @@ class Store(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), unique=True, nullable=False)
+    code = Column(String(10), unique=True)
     address = Column(String(255))
     phone = Column(String(50))
     is_active = Column(Boolean, default=True)
+    sale_sequence = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     cash_registers = relationship("CashRegister", back_populates="store")

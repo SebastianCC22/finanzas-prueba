@@ -286,12 +286,16 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
     if existing_closing:
         raise HTTPException(status_code=400, detail="La caja ya fue cerrada hoy.")
     
-    sale_count = db.query(Sale).filter(
-        func.date(Sale.created_at) == today.date()
-    ).count()
-    sale_number = f"VTA-{today.strftime('%Y%m%d')}-{sale_count + 1:04d}"
-    
     try:
+        store = db.query(Store).filter(Store.id == sale_data.store_id).with_for_update().first()
+        if not store:
+            raise HTTPException(status_code=404, detail="Tienda no encontrada")
+        
+        store.sale_sequence = (store.sale_sequence or 0) + 1
+        sequence_num = store.sale_sequence
+        
+        store_code = store.code or f"T{store.id}"
+        sale_number = f"{store_code}-{today.strftime('%Y%m%d')}-{sequence_num:06d}"
         products_to_update = {}
         for item_data in sale_data.items:
             if item_data.product_id:
