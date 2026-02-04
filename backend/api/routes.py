@@ -1,5 +1,7 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+import shutil
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, UploadFile, File
 from fastapi.responses import FileResponse
 from pathlib import Path
 from sqlalchemy.orm import Session
@@ -1962,17 +1964,134 @@ def get_invoice_summary(
         invoices_due_soon_count=due_soon_count
     )
 
-@router.post("/supplier-invoices/{invoice_id}/image")
-async def upload_invoice_image(
+ALLOWED_FILE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png", 
+    "image/gif": ".gif",
+    "application/pdf": ".pdf"
+}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+@router.post("/supplier-invoices/{invoice_id}/upload-file")
+async def upload_invoice_file(
+    invoice_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    db_invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == invoice_id).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    
+    if file.content_type not in ALLOWED_FILE_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Tipo de archivo no permitido. Permitidos: JPG, PNG, GIF, PDF"
+        )
+    
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El archivo excede el tamaño máximo de 5MB"
+        )
+    
+    upload_dir = Path(f"uploads/supplier_invoices/{db_invoice.supplier_id}/{invoice_id}")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    if db_invoice.invoice_file_url:
+        old_file = Path(db_invoice.invoice_file_url)
+        if old_file.exists():
+            old_file.unlink()
+    
+    file_extension = ALLOWED_FILE_TYPES[file.content_type]
+    unique_filename = f"{uuid.uuid4().hex}{file_extension}"
+    file_path = upload_dir / unique_filename
+    
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
+    db_invoice.invoice_file_url = str(file_path)
+    db_invoice.invoice_file_name = file.filename
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="upload_invoice_file",
+        entity_type="supplier_invoice",
+        entity_id=invoice_id,
+        new_values=f"Archivo subido: {file.filename}"
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(db_invoice)
+    
+    return {
+        "message": "Archivo subido exitosamente",
+        "file_name": file.filename,
+        "file_url": f"/api/supplier-invoices/{invoice_id}/file"
+    }
+
+@router.get("/supplier-invoices/{invoice_id}/file")
+async def get_invoice_file(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller_or_admin)
+):
+    db_invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == invoice_id).first()
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    
+    if not db_invoice.invoice_file_url:
+        raise HTTPException(status_code=404, detail="La factura no tiene archivo adjunto")
+    
+    file_path = Path(db_invoice.invoice_file_url)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Archivo no encontrado en el servidor")
+    
+    content_type = "application/octet-stream"
+    for mime, ext in ALLOWED_FILE_TYPES.items():
+        if str(file_path).endswith(ext):
+            content_type = mime
+            break
+    
+    return FileResponse(
+        path=str(file_path),
+        filename=db_invoice.invoice_file_name or file_path.name,
+        media_type=content_type
+    )
+
+@router.delete("/supplier-invoices/{invoice_id}/file")
+async def delete_invoice_file(
     invoice_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
     db_invoice = db.query(SupplierInvoice).filter(SupplierInvoice.id == invoice_id).first()
     if not db_invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
     
-    return {"message": "Use PUT /supplier-invoices/{id} with image_url field to update image"}
+    if not db_invoice.invoice_file_url:
+        raise HTTPException(status_code=404, detail="La factura no tiene archivo adjunto")
+    
+    file_path = Path(db_invoice.invoice_file_url)
+    if file_path.exists():
+        file_path.unlink()
+    
+    old_filename = db_invoice.invoice_file_name
+    db_invoice.invoice_file_url = None
+    db_invoice.invoice_file_name = None
+    
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="delete_invoice_file",
+        entity_type="supplier_invoice",
+        entity_id=invoice_id,
+        new_values=f"Archivo eliminado: {old_filename}"
+    )
+    db.add(audit)
+    db.commit()
+    
+    return {"message": "Archivo eliminado exitosamente"}
 
 @router.delete("/supplier-invoices/{invoice_id}")
 def delete_supplier_invoice(
