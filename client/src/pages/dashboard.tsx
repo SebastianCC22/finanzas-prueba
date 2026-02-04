@@ -65,7 +65,7 @@ export default function Dashboard() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen -m-6 bg-slate-950 flex flex-col">
+      <div className="min-h-screen -m-4 md:-m-8 bg-slate-950 flex flex-col">
         <div className="px-8 pt-8 pb-4">
           <div className="flex items-center gap-2 text-emerald-400 mb-1">
             <Store className="h-4 w-4" />
