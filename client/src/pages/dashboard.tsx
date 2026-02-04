@@ -268,33 +268,45 @@ export default function Dashboard() {
           </div>
         </>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-none shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-emerald-100">
-                Ventas Hoy
-              </CardTitle>
-              <ShoppingCart className="h-4 w-4 text-emerald-100" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold font-mono" data-testid="text-sales-today">
+        <div className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto mt-8">
+          <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden">
+            <div className="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 p-8 text-white">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-emerald-100 text-sm font-medium uppercase tracking-widest">
+                  Ventas del Día
+                </span>
+                <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
+                  <ShoppingCart className="h-6 w-6" />
+                </div>
+              </div>
+              <div className="text-5xl font-bold font-mono tracking-tight mb-2" data-testid="text-sales-today">
                 {formatCurrency(stats?.total_sales_today || 0)}
               </div>
-            </CardContent>
+              <div className="flex items-center gap-2 text-emerald-100 text-sm">
+                <Receipt className="h-4 w-4" />
+                <span>{stats?.sales_count_today || 0} transacciones</span>
+              </div>
+            </div>
           </Card>
 
-          <Card className="bg-gradient-to-br from-rose-500 to-rose-600 text-white border-none shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-rose-100">
-                Egresos Hoy
-              </CardTitle>
-              <ArrowDownCircle className="h-4 w-4 text-rose-100" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold font-mono" data-testid="text-expenses-today">
+          <Card className="border-0 shadow-2xl rounded-3xl overflow-hidden">
+            <div className="bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 p-8 text-white">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-slate-300 text-sm font-medium uppercase tracking-widest">
+                  Egresos del Día
+                </span>
+                <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
+                  <ArrowDownCircle className="h-6 w-6" />
+                </div>
+              </div>
+              <div className="text-5xl font-bold font-mono tracking-tight mb-2" data-testid="text-expenses-today">
                 {formatCurrency(stats?.total_expenses_today || 0)}
               </div>
-            </CardContent>
+              <div className="flex items-center gap-2 text-slate-400 text-sm">
+                <Wallet className="h-4 w-4" />
+                <span>Gastos registrados</span>
+              </div>
+            </div>
           </Card>
         </div>
       )}
