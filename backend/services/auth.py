@@ -1,4 +1,3 @@
-import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -8,6 +7,7 @@ from sqlalchemy.orm import Session
 from backend.models.database import get_db
 from backend.models.models import User
 from backend.services.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRE_MINUTES
+from backend.services.security import hash_password, verify_password
 
 SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = JWT_ALGORITHM
@@ -15,11 +15,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = JWT_EXPIRE_MINUTES
 
 security = HTTPBearer()
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-
 def get_password_hash(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    """Wrapper para mantener compatibilidad con código existente."""
+    return hash_password(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()

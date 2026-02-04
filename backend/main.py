@@ -90,6 +90,10 @@ async def lifespan(app: FastAPI):
             db.add(cajero_tunal)
             db.commit()
             logger.info("Usuario Cajero Tunal creado")
+        elif cajero_tunal:
+            cajero_tunal.password_hash = get_password_hash(TUNAL_SELLER_PASSWORD)
+            db.commit()
+            logger.info("Contraseña de Cajero Tunal actualizada")
         
         cajero_20j = db.query(User).filter(User.username == "Cajero 20J").first()
         if not cajero_20j and store_20:
@@ -104,6 +108,10 @@ async def lifespan(app: FastAPI):
             db.add(cajero_20j)
             db.commit()
             logger.info("Usuario Cajero 20J creado")
+        elif cajero_20j:
+            cajero_20j.password_hash = get_password_hash(SELLER_20J_PASSWORD)
+            db.commit()
+            logger.info("Contraseña de Cajero 20J actualizada")
         
         cash_registers = db.query(CashRegister).first()
         if not cash_registers and store_tunal and store_20:
