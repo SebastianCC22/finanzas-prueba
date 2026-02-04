@@ -36,8 +36,11 @@ export const useAuthStore = create<AuthState>()(
         const stores = await api.getStores();
         set({ stores });
         
-        if (stores.length > 0) {
-          set({ currentStore: stores[0] });
+        if (response.user.store_id) {
+          const userStore = stores.find(s => s.id === response.user.store_id);
+          if (userStore) {
+            set({ currentStore: userStore });
+          }
         }
       },
 

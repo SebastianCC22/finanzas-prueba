@@ -78,6 +78,10 @@ class ApiClient {
     return this.request<Store[]>('/stores');
   }
 
+  async getStoresPublic() {
+    return this.request<Store[]>('/stores/public');
+  }
+
   async createStore(storeData: StoreCreate) {
     return this.request<Store>('/stores', {
       method: 'POST',
@@ -369,6 +373,7 @@ export interface User {
   email: string | null;
   full_name: string | null;
   role: 'admin' | 'seller' | 'viewer';
+  store_id: number | null;
   is_active: boolean;
   created_at: string;
 }
@@ -384,6 +389,7 @@ export interface UserCreate {
 export interface Store {
   id: number;
   name: string;
+  code: string | null;
   address: string | null;
   phone: string | null;
   is_active: boolean;

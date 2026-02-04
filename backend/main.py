@@ -19,7 +19,7 @@ from backend.api.routes import router
 from backend.services.auth import get_password_hash
 from backend.services.backup_service import create_backup, cleanup_old_backups
 from backend.services.logging_service import setup_logging, log_error, log_critical
-from backend.services.config import validate_environment, ADMIN_DEFAULT_PASSWORD, SELLER_DEFAULT_PASSWORD
+from backend.services.config import validate_environment, ADMIN_DEFAULT_PASSWORD, SELLER_DEFAULT_PASSWORD, TUNAL_SELLER_PASSWORD, SELLER_20J_PASSWORD
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -63,19 +63,6 @@ async def lifespan(app: FastAPI):
             db.commit()
             logger.info("Usuario admin por defecto creado: Administrador")
         
-        cajero = db.query(User).filter(User.username == "Cajero").first()
-        if not cajero:
-            cajero = User(
-                username="Cajero",
-                email="cajero@example.com",
-                password_hash=get_password_hash(SELLER_DEFAULT_PASSWORD),
-                full_name="Cajero",
-                role="seller"
-            )
-            db.add(cajero)
-            db.commit()
-            print("Default cajero user created: Cajero")
-        
         stores = db.query(Store).all()
         if not stores:
             store_tunal = Store(name="Tunal", code="TUN", address="Centro Comercial Tunal", sale_sequence=0)
@@ -85,7 +72,41 @@ async def lifespan(app: FastAPI):
             db.commit()
             db.refresh(store_tunal)
             db.refresh(store_20)
-            
+            logger.info("Tiendas creadas: Tunal, 20 de Julio")
+        else:
+            store_tunal = db.query(Store).filter(Store.code == "TUN").first()
+            store_20 = db.query(Store).filter(Store.code == "20J").first()
+        
+        cajero_tunal = db.query(User).filter(User.username == "Cajero Tunal").first()
+        if not cajero_tunal and store_tunal:
+            cajero_tunal = User(
+                username="Cajero Tunal",
+                email="cajero.tunal@example.com",
+                password_hash=get_password_hash(TUNAL_SELLER_PASSWORD),
+                full_name="Cajero Tunal",
+                role="seller",
+                store_id=store_tunal.id
+            )
+            db.add(cajero_tunal)
+            db.commit()
+            logger.info("Usuario Cajero Tunal creado")
+        
+        cajero_20j = db.query(User).filter(User.username == "Cajero 20J").first()
+        if not cajero_20j and store_20:
+            cajero_20j = User(
+                username="Cajero 20J",
+                email="cajero.20j@example.com",
+                password_hash=get_password_hash(SELLER_20J_PASSWORD),
+                full_name="Cajero 20 de Julio",
+                role="seller",
+                store_id=store_20.id
+            )
+            db.add(cajero_20j)
+            db.commit()
+            logger.info("Usuario Cajero 20J creado")
+        
+        cash_registers = db.query(CashRegister).first()
+        if not cash_registers and store_tunal and store_20:
             for store in [store_tunal, store_20]:
                 for method in ["efectivo", "nequi", "bold", "daviplata"]:
                     menor = CashRegister(
@@ -118,7 +139,7 @@ async def lifespan(app: FastAPI):
                 db.add(global_register)
             
             db.commit()
-            print("Default stores and cash registers created")
+            logger.info("Cajas registradoras creadas")
     finally:
         db.close()
     

@@ -37,6 +37,7 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase):
     id: int
+    store_id: Optional[int] = None
     is_active: bool
     created_at: datetime
 
@@ -54,6 +55,7 @@ class Token(BaseModel):
 
 class StoreBase(BaseModel):
     name: str
+    code: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
 

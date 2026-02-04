@@ -129,6 +129,10 @@ def create_store(store: StoreCreate, db: Session = Depends(get_db), current_user
     db.commit()
     return db_store
 
+@router.get("/stores/public", response_model=List[StoreResponse])
+def get_stores_public(db: Session = Depends(get_db)):
+    return db.query(Store).filter(Store.is_active == True).all()
+
 @router.get("/stores", response_model=List[StoreResponse])
 def get_stores(db: Session = Depends(get_db)):
     return db.query(Store).filter(Store.is_active == True).all()
