@@ -286,105 +286,110 @@ def create_sale(sale_data: SaleCreate, db: Session = Depends(get_db), current_us
     ).count()
     sale_number = f"VTA-{today.strftime('%Y%m%d')}-{sale_count + 1:04d}"
     
-    subtotal = Decimal('0')
-    tax_total = Decimal('0')
-    discount_total = Decimal('0')
-    
-    sale = Sale(
-        store_id=sale_data.store_id,
-        user_id=current_user.id,
-        sale_number=sale_number,
-        global_discount=Decimal(str(sale_data.global_discount)),
-        global_discount_reason=sale_data.global_discount_reason,
-        notes=sale_data.notes
-    )
-    db.add(sale)
-    db.flush()
-    
-    for item_data in sale_data.items:
-        item_subtotal = Decimal(str(item_data.final_price)) * item_data.quantity
-        iva_amount = Decimal('0')
-        if item_data.has_iva:
-            iva_amount = item_subtotal * Decimal('0.19')
-            tax_total += iva_amount
+    try:
+        subtotal = Decimal('0')
+        tax_total = Decimal('0')
+        discount_total = Decimal('0')
         
-        item_discount = (Decimal(str(item_data.original_price)) - Decimal(str(item_data.final_price))) * item_data.quantity
-        discount_total += item_discount
-        subtotal += item_subtotal
-        
-        sale_item = SaleItem(
-            sale_id=sale.id,
-            product_id=item_data.product_id,
-            product_name=item_data.product_name,
-            quantity=item_data.quantity,
-            original_price=Decimal(str(item_data.original_price)),
-            final_price=Decimal(str(item_data.final_price)),
-            discount_amount=Decimal(str(item_data.discount_amount)),
-            discount_percent=Decimal(str(item_data.discount_percent)),
-            discount_reason=item_data.discount_reason,
-            has_iva=item_data.has_iva,
-            iva_amount=iva_amount,
-            subtotal=item_subtotal + iva_amount
+        sale = Sale(
+            store_id=sale_data.store_id,
+            user_id=current_user.id,
+            sale_number=sale_number,
+            global_discount=Decimal(str(sale_data.global_discount)),
+            global_discount_reason=sale_data.global_discount_reason,
+            notes=sale_data.notes
         )
-        db.add(sale_item)
+        db.add(sale)
+        db.flush()
         
-        if item_data.product_id:
-            product = db.query(Product).filter(Product.id == item_data.product_id).first()
-            if product:
-                old_qty = product.quantity
-                product.quantity -= item_data.quantity
-                
-                movement = StockMovement(
-                    product_id=product.id,
-                    user_id=current_user.id,
-                    movement_type="sale",
-                    quantity=-item_data.quantity,
-                    previous_quantity=old_qty,
-                    new_quantity=product.quantity,
-                    reason=f"Venta {sale_number}",
-                    reference_id=sale.id,
-                    reference_type="sale"
-                )
-                db.add(movement)
-    
-    total = subtotal - Decimal(str(sale_data.global_discount))
-    sale.subtotal = subtotal
-    sale.tax_total = tax_total
-    sale.discount_total = discount_total
-    sale.total = total
-    
-    total_payments = Decimal('0')
-    for payment_data in sale_data.payments:
-        payment = Payment(
-            sale_id=sale.id,
-            cash_register_id=payment_data.cash_register_id,
-            payment_method=payment_data.payment_method.value,
-            amount=Decimal(str(payment_data.amount))
+        for item_data in sale_data.items:
+            item_subtotal = Decimal(str(item_data.final_price)) * item_data.quantity
+            iva_amount = Decimal('0')
+            if item_data.has_iva:
+                iva_amount = item_subtotal * Decimal('0.19')
+                tax_total += iva_amount
+            
+            item_discount = (Decimal(str(item_data.original_price)) - Decimal(str(item_data.final_price))) * item_data.quantity
+            discount_total += item_discount
+            subtotal += item_subtotal
+            
+            sale_item = SaleItem(
+                sale_id=sale.id,
+                product_id=item_data.product_id,
+                product_name=item_data.product_name,
+                quantity=item_data.quantity,
+                original_price=Decimal(str(item_data.original_price)),
+                final_price=Decimal(str(item_data.final_price)),
+                discount_amount=Decimal(str(item_data.discount_amount)),
+                discount_percent=Decimal(str(item_data.discount_percent)),
+                discount_reason=item_data.discount_reason,
+                has_iva=item_data.has_iva,
+                iva_amount=iva_amount,
+                subtotal=item_subtotal + iva_amount
+            )
+            db.add(sale_item)
+            
+            if item_data.product_id:
+                product = db.query(Product).filter(Product.id == item_data.product_id).first()
+                if product:
+                    old_qty = product.quantity
+                    product.quantity -= item_data.quantity
+                    
+                    movement = StockMovement(
+                        product_id=product.id,
+                        user_id=current_user.id,
+                        movement_type="sale",
+                        quantity=-item_data.quantity,
+                        previous_quantity=old_qty,
+                        new_quantity=product.quantity,
+                        reason=f"Venta {sale_number}",
+                        reference_id=sale.id,
+                        reference_type="sale"
+                    )
+                    db.add(movement)
+        
+        total = subtotal - Decimal(str(sale_data.global_discount))
+        sale.subtotal = subtotal
+        sale.tax_total = tax_total
+        sale.discount_total = discount_total
+        sale.total = total
+        
+        total_payments = Decimal('0')
+        for payment_data in sale_data.payments:
+            payment = Payment(
+                sale_id=sale.id,
+                cash_register_id=payment_data.cash_register_id,
+                payment_method=payment_data.payment_method.value,
+                amount=Decimal(str(payment_data.amount))
+            )
+            db.add(payment)
+            total_payments += Decimal(str(payment_data.amount))
+            
+            register = db.query(CashRegister).filter(CashRegister.id == payment_data.cash_register_id).first()
+            if register:
+                register.current_balance += Decimal(str(payment_data.amount))
+        
+        if total_payments < total:
+            raise HTTPException(status_code=400, detail="El pago no cubre el total de la venta")
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="create_sale",
+            entity_type="sale",
+            entity_id=sale.id,
+            new_values=f"Sale {sale_number} - Total: ${total}"
         )
-        db.add(payment)
-        total_payments += Decimal(str(payment_data.amount))
+        db.add(audit)
         
-        register = db.query(CashRegister).filter(CashRegister.id == payment_data.cash_register_id).first()
-        if register:
-            register.current_balance += Decimal(str(payment_data.amount))
-    
-    if total_payments < total:
-        raise HTTPException(status_code=400, detail="El pago no cubre el total de la venta")
-    
-    db.commit()
-    db.refresh(sale)
-    
-    audit = AuditLog(
-        user_id=current_user.id,
-        action="create_sale",
-        entity_type="sale",
-        entity_id=sale.id,
-        new_values=f"Sale {sale_number} - Total: ${total}"
-    )
-    db.add(audit)
-    db.commit()
-    
-    return sale
+        db.commit()
+        db.refresh(sale)
+        return sale
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al procesar la venta: {str(e)}")
 
 @router.get("/sales", response_model=List[SaleResponse])
 def get_sales(
@@ -425,85 +430,90 @@ def create_return(return_data: ReturnCreate, db: Session = Depends(get_db), curr
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
     
-    return_record = Return(
-        sale_id=return_data.sale_id,
-        user_id=current_user.id,
-        return_type=return_data.return_type,
-        reason=return_data.reason
-    )
-    db.add(return_record)
-    db.flush()
-    
-    total_refund = Decimal('0')
-    
-    for item_data in return_data.items:
-        sale_item = db.query(SaleItem).filter(SaleItem.id == item_data.sale_item_id).first()
-        if not sale_item:
-            raise HTTPException(status_code=404, detail=f"Sale item {item_data.sale_item_id} not found")
-        
-        refund_amount = (sale_item.subtotal / sale_item.quantity) * item_data.quantity
-        total_refund += refund_amount
-        
-        return_item = ReturnItem(
-            return_id=return_record.id,
-            sale_item_id=item_data.sale_item_id,
-            quantity=item_data.quantity,
-            refund_amount=refund_amount,
-            restock=item_data.restock
+    try:
+        return_record = Return(
+            sale_id=return_data.sale_id,
+            user_id=current_user.id,
+            return_type=return_data.return_type,
+            reason=return_data.reason
         )
-        db.add(return_item)
+        db.add(return_record)
+        db.flush()
         
-        if item_data.restock and sale_item.product_id:
-            product = db.query(Product).filter(Product.id == sale_item.product_id).first()
-            if product:
-                old_qty = product.quantity
-                product.quantity += item_data.quantity
-                
-                movement = StockMovement(
-                    product_id=product.id,
-                    user_id=current_user.id,
-                    movement_type="return",
-                    quantity=item_data.quantity,
-                    previous_quantity=old_qty,
-                    new_quantity=product.quantity,
-                    reason=f"Devolución de venta {sale.sale_number}",
-                    reference_id=return_record.id,
-                    reference_type="return"
-                )
-                db.add(movement)
-    
-    return_record.total_refund = total_refund
-    
-    for payment in sale.payments:
-        refund_amount = (total_refund * Decimal(str(payment.amount))) / Decimal(str(sale.total))
+        total_refund = Decimal('0')
         
-        refund_payment = Payment(
-            return_id=return_record.id,
-            cash_register_id=payment.cash_register_id,
-            payment_method=payment.payment_method,
-            amount=refund_amount,
-            is_refund=True
+        for item_data in return_data.items:
+            sale_item = db.query(SaleItem).filter(SaleItem.id == item_data.sale_item_id).first()
+            if not sale_item:
+                raise HTTPException(status_code=404, detail=f"Sale item {item_data.sale_item_id} not found")
+            
+            refund_amount = (sale_item.subtotal / sale_item.quantity) * item_data.quantity
+            total_refund += refund_amount
+            
+            return_item = ReturnItem(
+                return_id=return_record.id,
+                sale_item_id=item_data.sale_item_id,
+                quantity=item_data.quantity,
+                refund_amount=refund_amount,
+                restock=item_data.restock
+            )
+            db.add(return_item)
+            
+            if item_data.restock and sale_item.product_id:
+                product = db.query(Product).filter(Product.id == sale_item.product_id).first()
+                if product:
+                    old_qty = product.quantity
+                    product.quantity += item_data.quantity
+                    
+                    movement = StockMovement(
+                        product_id=product.id,
+                        user_id=current_user.id,
+                        movement_type="return",
+                        quantity=item_data.quantity,
+                        previous_quantity=old_qty,
+                        new_quantity=product.quantity,
+                        reason=f"Devolución de venta {sale.sale_number}",
+                        reference_id=return_record.id,
+                        reference_type="return"
+                    )
+                    db.add(movement)
+        
+        return_record.total_refund = total_refund
+        
+        for payment in sale.payments:
+            refund_amount = (total_refund * Decimal(str(payment.amount))) / Decimal(str(sale.total))
+            
+            refund_payment = Payment(
+                return_id=return_record.id,
+                cash_register_id=payment.cash_register_id,
+                payment_method=payment.payment_method,
+                amount=refund_amount,
+                is_refund=True
+            )
+            db.add(refund_payment)
+            
+            register = db.query(CashRegister).filter(CashRegister.id == payment.cash_register_id).first()
+            if register:
+                register.current_balance -= refund_amount
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="create_return",
+            entity_type="return",
+            entity_id=return_record.id,
+            new_values=f"Return for sale {sale.sale_number} - Refund: ${total_refund}"
         )
-        db.add(refund_payment)
+        db.add(audit)
         
-        register = db.query(CashRegister).filter(CashRegister.id == payment.cash_register_id).first()
-        if register:
-            register.current_balance -= refund_amount
-    
-    db.commit()
-    db.refresh(return_record)
-    
-    audit = AuditLog(
-        user_id=current_user.id,
-        action="create_return",
-        entity_type="return",
-        entity_id=return_record.id,
-        new_values=f"Return for sale {sale.sale_number} - Refund: ${total_refund}"
-    )
-    db.add(audit)
-    db.commit()
-    
-    return return_record
+        db.commit()
+        db.refresh(return_record)
+        return return_record
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al procesar la devolución: {str(e)}")
 
 @router.get("/returns", response_model=List[ReturnResponse])
 def get_returns(
@@ -716,32 +726,39 @@ def create_cash_transfer(
         if from_register.store_id != to_register.store_id and not from_register.is_global and not to_register.is_global:
             raise HTTPException(status_code=400, detail="No se puede transferir efectivo entre tiendas diferentes")
     
-    transfer = CashTransfer(
-        from_register_id=transfer_data.from_register_id,
-        to_register_id=transfer_data.to_register_id,
-        user_id=current_user.id,
-        amount=Decimal(str(transfer_data.amount)),
-        note=transfer_data.note
-    )
-    db.add(transfer)
-    
-    from_register.current_balance -= Decimal(str(transfer_data.amount))
-    to_register.current_balance += Decimal(str(transfer_data.amount))
-    
-    db.commit()
-    db.refresh(transfer)
-    
-    audit = AuditLog(
-        user_id=current_user.id,
-        action="create_cash_transfer",
-        entity_type="cash_transfer",
-        entity_id=transfer.id,
-        new_values=f"Transfer: ${transfer_data.amount} from {from_register.name} to {to_register.name}"
-    )
-    db.add(audit)
-    db.commit()
-    
-    return transfer
+    try:
+        transfer = CashTransfer(
+            from_register_id=transfer_data.from_register_id,
+            to_register_id=transfer_data.to_register_id,
+            user_id=current_user.id,
+            amount=Decimal(str(transfer_data.amount)),
+            note=transfer_data.note
+        )
+        db.add(transfer)
+        
+        from_register.current_balance -= Decimal(str(transfer_data.amount))
+        to_register.current_balance += Decimal(str(transfer_data.amount))
+        
+        db.flush()
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="create_cash_transfer",
+            entity_type="cash_transfer",
+            entity_id=transfer.id,
+            new_values=f"Transfer: ${transfer_data.amount} from {from_register.name} to {to_register.name}"
+        )
+        db.add(audit)
+        
+        db.commit()
+        db.refresh(transfer)
+        return transfer
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al procesar la transferencia: {str(e)}")
 
 @router.get("/cash-transfers", response_model=List[CashTransferResponse])
 def get_cash_transfers(
@@ -776,28 +793,32 @@ def create_cash_opening(
         if not has_closing:
             raise HTTPException(status_code=400, detail="Ya existe una apertura de caja abierta hoy. Debe cerrarla primero.")
     
-    opening = CashOpening(
-        store_id=opening_data.store_id,
-        user_id=current_user.id,
-        opening_date=datetime.now(),
-        initial_balance=Decimal(str(opening_data.initial_balance)),
-        notes=opening_data.notes
-    )
-    db.add(opening)
-    db.commit()
-    db.refresh(opening)
-    
-    audit = AuditLog(
-        user_id=current_user.id,
-        action="create_cash_opening",
-        entity_type="cash_opening",
-        entity_id=opening.id,
-        new_values=f"Opening: ${opening_data.initial_balance}"
-    )
-    db.add(audit)
-    db.commit()
-    
-    return opening
+    try:
+        opening = CashOpening(
+            store_id=opening_data.store_id,
+            user_id=current_user.id,
+            opening_date=datetime.now(),
+            initial_balance=Decimal(str(opening_data.initial_balance)),
+            notes=opening_data.notes
+        )
+        db.add(opening)
+        db.flush()
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="create_cash_opening",
+            entity_type="cash_opening",
+            entity_id=opening.id,
+            new_values=f"Opening: ${opening_data.initial_balance}"
+        )
+        db.add(audit)
+        
+        db.commit()
+        db.refresh(opening)
+        return opening
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear la apertura de caja: {str(e)}")
 
 @router.get("/cash-openings", response_model=List[CashOpeningResponse])
 def get_cash_openings(
@@ -917,35 +938,39 @@ def create_cash_closing(
     
     difference = Decimal(str(closing_data.actual_balance)) - expected_balance
     
-    closing = CashClosing(
-        opening_id=closing_data.opening_id,
-        store_id=closing_data.store_id,
-        user_id=current_user.id,
-        closing_date=datetime.now(),
-        expected_balance=expected_balance,
-        actual_balance=Decimal(str(closing_data.actual_balance)),
-        difference=difference,
-        total_sales=Decimal(str(total_sales)),
-        total_expenses=Decimal(str(total_expenses)),
-        total_transfers_in=Decimal(str(total_transfers_in)),
-        total_transfers_out=Decimal(str(total_transfers_out)),
-        notes=closing_data.notes
-    )
-    db.add(closing)
-    db.commit()
-    db.refresh(closing)
-    
-    audit = AuditLog(
-        user_id=current_user.id,
-        action="create_cash_closing",
-        entity_type="cash_closing",
-        entity_id=closing.id,
-        new_values=f"Closing: Expected ${expected_balance}, Actual ${closing_data.actual_balance}, Diff ${difference}"
-    )
-    db.add(audit)
-    db.commit()
-    
-    return closing
+    try:
+        closing = CashClosing(
+            opening_id=closing_data.opening_id,
+            store_id=closing_data.store_id,
+            user_id=current_user.id,
+            closing_date=datetime.now(),
+            expected_balance=expected_balance,
+            actual_balance=Decimal(str(closing_data.actual_balance)),
+            difference=difference,
+            total_sales=Decimal(str(total_sales)),
+            total_expenses=Decimal(str(total_expenses)),
+            total_transfers_in=Decimal(str(total_transfers_in)),
+            total_transfers_out=Decimal(str(total_transfers_out)),
+            notes=closing_data.notes
+        )
+        db.add(closing)
+        db.flush()
+        
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="create_cash_closing",
+            entity_type="cash_closing",
+            entity_id=closing.id,
+            new_values=f"Closing: Expected ${expected_balance}, Actual ${closing_data.actual_balance}, Diff ${difference}"
+        )
+        db.add(audit)
+        
+        db.commit()
+        db.refresh(closing)
+        return closing
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear el cierre de caja: {str(e)}")
 
 @router.get("/cash-closings", response_model=List[CashClosingResponse])
 def get_cash_closings(
@@ -1643,55 +1668,62 @@ def add_invoice_payment(
     if Decimal(str(payment.amount)) > remaining:
         raise HTTPException(status_code=400, detail=f"Payment amount exceeds remaining balance of {remaining}")
     
-    db_payment = InvoicePayment(
-        invoice_id=invoice_id,
-        amount=Decimal(str(payment.amount)),
-        payment_method=payment.payment_method,
-        reference=payment.reference,
-        notes=payment.notes
-    )
-    db.add(db_payment)
-    
-    db_invoice.paid_amount = Decimal(str(db_invoice.paid_amount)) + Decimal(str(payment.amount))
-    
-    if Decimal(str(db_invoice.paid_amount)) >= Decimal(str(db_invoice.total_amount)):
-        db_invoice.status = "pagada"
-    elif Decimal(str(db_invoice.paid_amount)) > 0:
-        db_invoice.status = "parcial"
-    
-    db.commit()
-    db.refresh(db_invoice)
-    
-    supplier = db.query(Supplier).filter(Supplier.id == db_invoice.supplier_id).first()
-    payments = db.query(InvoicePayment).filter(InvoicePayment.invoice_id == db_invoice.id).order_by(InvoicePayment.payment_date.desc()).all()
-    
-    return SupplierInvoiceResponse(
-        id=db_invoice.id,
-        supplier_id=db_invoice.supplier_id,
-        invoice_number=db_invoice.invoice_number,
-        issue_date=db_invoice.issue_date,
-        due_date=db_invoice.due_date,
-        total_amount=Decimal(str(db_invoice.total_amount)),
-        paid_amount=Decimal(str(db_invoice.paid_amount)),
-        payment_type=db_invoice.payment_type,
-        status=db_invoice.status,
-        image_url=db_invoice.image_url,
-        notes=db_invoice.notes,
-        created_at=db_invoice.created_at,
-        updated_at=db_invoice.updated_at,
-        supplier_name=supplier.name if supplier else "",
-        remaining_amount=Decimal(str(db_invoice.total_amount)) - Decimal(str(db_invoice.paid_amount)),
-        payments=[InvoicePaymentResponse(
-            id=p.id,
-            invoice_id=p.invoice_id,
-            amount=Decimal(str(p.amount)),
-            payment_date=p.payment_date,
-            payment_method=p.payment_method,
-            reference=p.reference,
-            notes=p.notes,
-            created_at=p.created_at
-        ) for p in payments]
-    )
+    try:
+        db_payment = InvoicePayment(
+            invoice_id=invoice_id,
+            amount=Decimal(str(payment.amount)),
+            payment_method=payment.payment_method,
+            reference=payment.reference,
+            notes=payment.notes
+        )
+        db.add(db_payment)
+        
+        db_invoice.paid_amount = Decimal(str(db_invoice.paid_amount)) + Decimal(str(payment.amount))
+        
+        if Decimal(str(db_invoice.paid_amount)) >= Decimal(str(db_invoice.total_amount)):
+            db_invoice.status = "pagada"
+        elif Decimal(str(db_invoice.paid_amount)) > 0:
+            db_invoice.status = "parcial"
+        
+        db.commit()
+        db.refresh(db_invoice)
+        
+        supplier = db.query(Supplier).filter(Supplier.id == db_invoice.supplier_id).first()
+        payments = db.query(InvoicePayment).filter(InvoicePayment.invoice_id == db_invoice.id).order_by(InvoicePayment.payment_date.desc()).all()
+        
+        return SupplierInvoiceResponse(
+            id=db_invoice.id,
+            supplier_id=db_invoice.supplier_id,
+            invoice_number=db_invoice.invoice_number,
+            issue_date=db_invoice.issue_date,
+            due_date=db_invoice.due_date,
+            total_amount=Decimal(str(db_invoice.total_amount)),
+            paid_amount=Decimal(str(db_invoice.paid_amount)),
+            payment_type=db_invoice.payment_type,
+            status=db_invoice.status,
+            image_url=db_invoice.image_url,
+            notes=db_invoice.notes,
+            created_at=db_invoice.created_at,
+            updated_at=db_invoice.updated_at,
+            supplier_name=supplier.name if supplier else "",
+            remaining_amount=Decimal(str(db_invoice.total_amount)) - Decimal(str(db_invoice.paid_amount)),
+            payments=[InvoicePaymentResponse(
+                id=p.id,
+                invoice_id=p.invoice_id,
+                amount=Decimal(str(p.amount)),
+                payment_date=p.payment_date,
+                payment_method=p.payment_method,
+                reference=p.reference,
+                notes=p.notes,
+                created_at=p.created_at
+            ) for p in payments]
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al procesar el pago: {str(e)}")
 
 @router.get("/supplier-invoices/summary", response_model=SupplierInvoiceSummary)
 def get_invoice_summary(
