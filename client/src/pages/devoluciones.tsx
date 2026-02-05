@@ -17,8 +17,9 @@ import { format } from "date-fns";
 import { RequireOpening } from "@/components/require-opening";
 
 function DevolucionesContent() {
-  const { currentStore } = useAuthStore();
+  const { currentStore, user } = useAuthStore();
   const { toast } = useToast();
+  const isAdmin = user?.role === "admin";
 
   const [sales, setSales] = useState<Sale[]>([]);
   const [returns, setReturns] = useState<Return[]>([]);
@@ -153,127 +154,145 @@ function DevolucionesContent() {
   };
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold" data-testid="text-page-title">
-        Devoluciones - {currentStore?.name}
-      </h1>
+    <div className={`min-h-screen ${!isAdmin ? '-m-4 md:-m-8 bg-slate-950 p-6' : 'container mx-auto p-4'} space-y-6`}>
+      <div className={!isAdmin ? 'max-w-6xl mx-auto' : ''}>
+        <h1 className={`text-2xl font-bold ${!isAdmin ? 'text-white' : ''}`} data-testid="text-page-title">
+          Devoluciones
+        </h1>
+        <p className={`text-sm mt-1 ${!isAdmin ? 'text-slate-400' : 'text-muted-foreground'}`}>
+          {currentStore?.name}
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Buscar Venta para Devolver
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por número de venta..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-sale"
-              />
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead></TableHead>
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 ${!isAdmin ? 'max-w-6xl mx-auto' : ''}`}>
+        <div className={`rounded-xl ${!isAdmin ? 'bg-slate-900/50 border border-slate-800' : 'bg-card border'} p-5`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Package className={`h-5 w-5 ${!isAdmin ? 'text-emerald-400' : ''}`} />
+            <span className={`font-semibold ${!isAdmin ? 'text-white' : ''}`}>Buscar Venta</span>
+          </div>
+          <div className="relative mb-4">
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${!isAdmin ? 'text-slate-500' : 'text-muted-foreground'}`} />
+            <Input
+              placeholder="Buscar por número de venta..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`pl-10 ${!isAdmin ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : ''}`}
+              data-testid="input-search-sale"
+            />
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className={!isAdmin ? 'border-slate-700' : ''}>
+                  <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Número</TableHead>
+                  <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Fecha</TableHead>
+                  <TableHead className={`text-right ${!isAdmin ? 'text-slate-400' : ''}`}>Total</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSales.map((sale) => (
+                  <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
+                    <TableCell className={`font-medium ${!isAdmin ? 'text-white' : ''}`}>{sale.sale_number}</TableCell>
+                    <TableCell className={!isAdmin ? 'text-slate-300' : ''}>
+                      {format(new Date(sale.created_at), "dd/MM/yyyy HH:mm")}
+                    </TableCell>
+                    <TableCell className={`text-right font-bold ${!isAdmin ? 'text-white' : ''}`}>
+                      ${sale.total.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openReturnDialog(sale)}
+                        className={!isAdmin ? 'border-slate-600 text-white hover:bg-slate-800' : ''}
+                        data-testid={`button-return-${sale.id}`}
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Devolver
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSales.map((sale) => (
-                    <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`}>
-                      <TableCell className="font-medium">{sale.sale_number}</TableCell>
-                      <TableCell>
-                        {format(new Date(sale.created_at), "dd/MM/yyyy HH:mm")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        ${sale.total.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openReturnDialog(sale)}
-                          data-testid={`button-return-${sale.id}`}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          Devolver
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+                {filteredSales.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className={`text-center py-8 ${!isAdmin ? 'text-slate-500' : 'text-muted-foreground'}`}>
+                      No hay ventas disponibles
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Historial de Devoluciones
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-96 overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Venta</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead className="text-right">Reembolso</TableHead>
+        <div className={`rounded-xl ${!isAdmin ? 'bg-slate-900/50 border border-slate-800' : 'bg-card border'} p-5`}>
+          <div className="flex items-center gap-2 mb-4">
+            <History className={`h-5 w-5 ${!isAdmin ? 'text-emerald-400' : ''}`} />
+            <span className={`font-semibold ${!isAdmin ? 'text-white' : ''}`}>Historial de Devoluciones</span>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className={!isAdmin ? 'border-slate-700' : ''}>
+                  <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Venta</TableHead>
+                  <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Tipo</TableHead>
+                  <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Fecha</TableHead>
+                  <TableHead className={`text-right ${!isAdmin ? 'text-slate-400' : ''}`}>Reembolso</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {returns.map((ret) => (
+                  <TableRow key={ret.id} data-testid={`row-return-${ret.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
+                    <TableCell className={`font-medium ${!isAdmin ? 'text-white' : ''}`}>#{ret.sale_id}</TableCell>
+                    <TableCell>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        ret.return_type === "total"
+                          ? (!isAdmin ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700')
+                          : (!isAdmin ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700')
+                      }`}>
+                        {ret.return_type === "total" ? "Total" : "Parcial"}
+                      </span>
+                    </TableCell>
+                    <TableCell className={!isAdmin ? 'text-slate-300' : ''}>
+                      {format(new Date(ret.created_at), "dd/MM/yyyy")}
+                    </TableCell>
+                    <TableCell className="text-right text-red-400 font-medium">
+                      -${ret.total_refund.toLocaleString()}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {returns.map((ret) => (
-                    <TableRow key={ret.id} data-testid={`row-return-${ret.id}`}>
-                      <TableCell className="font-medium">#{ret.sale_id}</TableCell>
-                      <TableCell>
-                        <Badge variant={ret.return_type === "total" ? "default" : "secondary"}>
-                          {ret.return_type === "total" ? "Total" : "Parcial"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(ret.created_at), "dd/MM/yyyy")}
-                      </TableCell>
-                      <TableCell className="text-right text-destructive">
-                        -${ret.total_refund.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+                {returns.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className={`text-center py-8 ${!isAdmin ? 'text-slate-500' : 'text-muted-foreground'}`}>
+                      No hay devoluciones registradas
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </div>
 
       <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className={`max-w-2xl ${!isAdmin ? 'bg-slate-900 border-slate-700 text-white' : ''}`}>
           <DialogHeader>
-            <DialogTitle>Procesar Devolución - {selectedSale?.sale_number}</DialogTitle>
+            <DialogTitle className={!isAdmin ? 'text-white' : ''}>
+              Procesar Devolución - {selectedSale?.sale_number}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Tipo de Devolución</Label>
+              <Label className={!isAdmin ? 'text-slate-300' : ''}>Tipo de Devolución</Label>
               <Select
                 value={returnType}
                 onValueChange={(v) => handleReturnTypeChange(v as "total" | "partial")}
               >
-                <SelectTrigger data-testid="select-return-type">
+                <SelectTrigger className={!isAdmin ? 'bg-slate-800 border-slate-700 text-white' : ''} data-testid="select-return-type">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={!isAdmin ? 'bg-slate-800 border-slate-700' : ''}>
                   <SelectItem value="total">Devolución Total</SelectItem>
                   <SelectItem value="partial">Devolución Parcial</SelectItem>
                 </SelectContent>
@@ -281,70 +300,78 @@ function DevolucionesContent() {
             </div>
 
             <div className="space-y-2">
-              <Label>Productos a Devolver</Label>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>Precio</TableHead>
-                    <TableHead>Cant. Original</TableHead>
-                    <TableHead>Cant. a Devolver</TableHead>
-                    <TableHead>Reingresar Stock</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedSale?.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.product_name}</TableCell>
-                      <TableCell>${item.final_price.toLocaleString()}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={item.quantity}
-                          value={selectedItems[item.id]?.quantity || 0}
-                          onChange={(e) =>
-                            updateItemQuantity(item.id, parseInt(e.target.value) || 0)
-                          }
-                          className="w-20"
-                          disabled={returnType === "total"}
-                          data-testid={`input-quantity-${item.id}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedItems[item.id]?.restock ?? true}
-                          onCheckedChange={(checked) =>
-                            updateItemRestock(item.id, checked as boolean)
-                          }
-                          data-testid={`checkbox-restock-${item.id}`}
-                        />
-                      </TableCell>
+              <Label className={!isAdmin ? 'text-slate-300' : ''}>Productos a Devolver</Label>
+              <div className={`rounded-lg overflow-hidden ${!isAdmin ? 'border border-slate-700' : 'border'}`}>
+                <Table>
+                  <TableHeader>
+                    <TableRow className={!isAdmin ? 'border-slate-700 bg-slate-800' : ''}>
+                      <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Producto</TableHead>
+                      <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Precio</TableHead>
+                      <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Original</TableHead>
+                      <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Devolver</TableHead>
+                      <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Reingresar</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedSale?.items.map((item) => (
+                      <TableRow key={item.id} className={!isAdmin ? 'border-slate-700' : ''}>
+                        <TableCell className={!isAdmin ? 'text-white' : ''}>{item.product_name}</TableCell>
+                        <TableCell className={!isAdmin ? 'text-slate-300' : ''}>${item.final_price.toLocaleString()}</TableCell>
+                        <TableCell className={!isAdmin ? 'text-slate-300' : ''}>{item.quantity}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={item.quantity}
+                            value={selectedItems[item.id]?.quantity || 0}
+                            onChange={(e) =>
+                              updateItemQuantity(item.id, parseInt(e.target.value) || 0)
+                            }
+                            className={`w-16 ${!isAdmin ? 'bg-slate-800 border-slate-600 text-white' : ''}`}
+                            disabled={returnType === "total"}
+                            data-testid={`input-quantity-${item.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedItems[item.id]?.restock ?? true}
+                            onCheckedChange={(checked) =>
+                              updateItemRestock(item.id, checked as boolean)
+                            }
+                            data-testid={`checkbox-restock-${item.id}`}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Motivo de Devolución *</Label>
+              <Label className={!isAdmin ? 'text-slate-300' : ''}>Motivo de Devolución *</Label>
               <Textarea
                 value={returnReason}
                 onChange={(e) => setReturnReason(e.target.value)}
                 placeholder="Ingrese el motivo de la devolución..."
+                className={!isAdmin ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : ''}
                 data-testid="input-return-reason"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReturnDialog(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowReturnDialog(false)}
+              className={!isAdmin ? 'border-slate-600 text-white hover:bg-slate-800' : ''}
+            >
               Cancelar
             </Button>
             <Button
               onClick={processReturn}
               disabled={isProcessing || !returnReason}
-              variant="destructive"
+              className={!isAdmin ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+              variant={isAdmin ? "destructive" : "default"}
               data-testid="button-confirm-return"
             >
               {isProcessing ? "Procesando..." : "Confirmar Devolución"}
