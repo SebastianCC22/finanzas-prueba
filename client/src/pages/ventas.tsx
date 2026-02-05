@@ -12,7 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, History, Eye, Check, Store, TrendingUp, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { es } from "date-fns/locale";
+
+const COLOMBIA_TZ = "America/Bogota";
 import { RequireOpening } from "@/components/require-opening";
 
 interface CartItem {
@@ -559,7 +562,7 @@ function VentasContent() {
                     
                     return (
                       <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
-                        <TableCell className={!isAdmin ? 'text-slate-300' : ''}>{format(new Date(sale.created_at), "h:mm a", { locale: es })}</TableCell>
+                        <TableCell className={!isAdmin ? 'text-slate-300' : ''}>{format(toZonedTime(new Date(sale.created_at), COLOMBIA_TZ), "h:mm a", { locale: es })}</TableCell>
                         <TableCell className={`max-w-[200px] truncate ${!isAdmin ? 'text-white' : ''}`}>
                           {productsSummary}{hasMore ? ` (+${(sale.items?.length || 0) - 2} más)` : ""}
                         </TableCell>
