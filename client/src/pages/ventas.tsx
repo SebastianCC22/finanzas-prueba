@@ -578,13 +578,9 @@ function VentasContent() {
                         {isNewDay && (
                           <TableRow key={`separator-${sale.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
                             <TableCell colSpan={5} className="py-2">
-                              <div className={`flex items-center gap-2 ${!isAdmin ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                                <div className={`flex-1 h-px ${!isAdmin ? 'bg-slate-700' : 'bg-border'}`}></div>
-                                <span className="text-xs font-medium px-2">
-                                  {format(toColombiaTime(sale.created_at), "EEEE, d 'de' MMMM", { locale: es })}
-                                </span>
-                                <div className={`flex-1 h-px ${!isAdmin ? 'bg-slate-700' : 'bg-border'}`}></div>
-                              </div>
+                              <span className={`text-xs font-medium capitalize ${!isAdmin ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                                {format(toColombiaTime(sale.created_at), "EEEE, d 'de' MMMM", { locale: es })}
+                              </span>
                             </TableCell>
                           </TableRow>
                         )}
