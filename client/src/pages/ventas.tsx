@@ -534,31 +534,64 @@ function VentasContent() {
               <Table>
                 <TableHeader>
                   <TableRow className={!isAdmin ? 'border-slate-700' : ''}>
-                    <TableHead className={!isAdmin ? 'text-slate-400' : ''}>No. Venta</TableHead>
                     <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Hora</TableHead>
+                    <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Productos</TableHead>
                     <TableHead className={`text-right ${!isAdmin ? 'text-slate-400' : ''}`}>Total</TableHead>
-                    <TableHead className={`text-right ${!isAdmin ? 'text-slate-400' : ''}`}>Ganancia</TableHead>
+                    <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Método de Pago</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {salesHistory.map((sale) => (
-                    <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
-                      <TableCell className={`font-medium ${!isAdmin ? 'text-white' : ''}`}>{sale.sale_number}</TableCell>
-                      <TableCell className={!isAdmin ? 'text-slate-300' : ''}>{format(new Date(sale.created_at), "HH:mm", { locale: es })}</TableCell>
-                      <TableCell className={`text-right font-bold ${!isAdmin ? 'text-white' : ''}`}>
-                        {formatCurrency(sale.total)}
-                      </TableCell>
-                      <TableCell className="text-right text-green-500 font-medium">
-                        {formatCurrency(sale.profit)}
-                      </TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="ghost" onClick={() => viewSaleDetails(sale)} className={!isAdmin ? 'text-slate-400 hover:text-white' : ''}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {salesHistory.map((sale) => {
+                    const paymentMethods = sale.payments?.map(p => {
+                      const methodLabels: Record<string, string> = {
+                        'efectivo': 'Efectivo',
+                        'nequi': 'Nequi',
+                        'daviplata': 'Daviplata',
+                        'bold': 'Bold',
+                        'transferencia': 'Transferencia'
+                      };
+                      return methodLabels[p.payment_method] || p.payment_method;
+                    }) || [];
+                    const uniqueMethods = Array.from(new Set(paymentMethods));
+                    const productsSummary = sale.items?.slice(0, 2).map(item => item.product_name).join(", ") || "";
+                    const hasMore = (sale.items?.length || 0) > 2;
+                    
+                    return (
+                      <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
+                        <TableCell className={!isAdmin ? 'text-slate-300' : ''}>{format(new Date(sale.created_at), "HH:mm", { locale: es })}</TableCell>
+                        <TableCell className={`max-w-[200px] truncate ${!isAdmin ? 'text-white' : ''}`}>
+                          {productsSummary}{hasMore ? ` (+${(sale.items?.length || 0) - 2} más)` : ""}
+                        </TableCell>
+                        <TableCell className={`text-right font-bold ${!isAdmin ? 'text-white' : ''}`}>
+                          {formatCurrency(sale.total)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {uniqueMethods.map((method, idx) => (
+                              <span 
+                                key={idx} 
+                                className={`text-xs px-2 py-0.5 rounded-full ${
+                                  method === 'Efectivo' 
+                                    ? (!isAdmin ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700')
+                                    : method === 'Nequi'
+                                      ? (!isAdmin ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700')
+                                      : (!isAdmin ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700')
+                                }`}
+                              >
+                                {method}
+                              </span>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="ghost" onClick={() => viewSaleDetails(sale)} className={!isAdmin ? 'text-slate-400 hover:text-white' : ''}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   {salesHistory.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className={`text-center py-8 ${!isAdmin ? 'text-slate-500' : 'text-muted-foreground'}`}>
