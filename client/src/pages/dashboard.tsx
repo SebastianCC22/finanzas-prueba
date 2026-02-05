@@ -83,40 +83,40 @@ export default function Dashboard() {
 
         <div className="flex-1 flex items-center justify-center px-6 pb-12">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600/80 to-teal-700/80 p-10 text-white shadow-xl shadow-emerald-900/20">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-10 text-white shadow-xl shadow-emerald-500/20">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
               <div className="relative">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm mb-6">
                   <ShoppingCart className="h-6 w-6" />
                 </div>
-                <p className="text-emerald-200/80 text-sm uppercase tracking-widest mb-3">
+                <p className="text-emerald-100 text-sm uppercase tracking-widest mb-3">
                   Ventas del Día
                 </p>
                 <p className="text-4xl md:text-5xl font-semibold tracking-tight mb-4" data-testid="text-sales-today">
                   {formatCurrency(stats?.total_sales_today || 0)}
                 </p>
-                <div className="flex items-center gap-2 text-emerald-200/70">
+                <div className="flex items-center gap-2 text-emerald-100">
                   <Receipt className="h-4 w-4" />
                   <span className="text-sm">{stats?.sales_count_today || 0} transacciones</span>
                 </div>
               </div>
             </div>
 
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-600/80 to-orange-700/80 p-10 text-white shadow-xl shadow-rose-900/20">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-500 to-orange-600 p-10 text-white shadow-xl shadow-rose-500/20">
               <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
               <div className="relative">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-sm mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm mb-6">
                   <ArrowDownCircle className="h-6 w-6" />
                 </div>
-                <p className="text-rose-200/80 text-sm uppercase tracking-widest mb-3">
+                <p className="text-rose-100 text-sm uppercase tracking-widest mb-3">
                   Egresos del Día
                 </p>
                 <p className="text-4xl md:text-5xl font-semibold tracking-tight mb-4" data-testid="text-expenses-today">
                   {formatCurrency(stats?.total_expenses_today || 0)}
                 </p>
-                <div className="flex items-center gap-2 text-rose-200/70">
+                <div className="flex items-center gap-2 text-rose-100">
                   <Wallet className="h-4 w-4" />
                   <span className="text-sm">Gastos registrados</span>
                 </div>
