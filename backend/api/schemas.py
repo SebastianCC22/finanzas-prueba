@@ -319,6 +319,16 @@ class CashClosingResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class CashClosingPreview(BaseModel):
+    opening_id: int
+    initial_balance: float
+    total_sales: float
+    total_cash_sales: float
+    total_expenses: float
+    total_transfers_in: float
+    total_transfers_out: float
+    expected_balance: float
+
 class AlertResponse(BaseModel):
     id: int
     store_id: Optional[int]

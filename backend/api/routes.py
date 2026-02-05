@@ -30,7 +30,7 @@ from backend.api.schemas import (
     ExpenseCreate, ExpenseResponse,
     CashTransferCreate, CashTransferResponse,
     CashOpeningCreate, CashOpeningResponse, CashOpeningUpdate,
-    CashClosingCreate, CashClosingResponse, CashClosingUpdate,
+    CashClosingCreate, CashClosingResponse, CashClosingUpdate, CashClosingPreview,
     AlertResponse, StockMovementResponse, DashboardStats,
     PaymentMethodStats, StoreStats, TopProduct, AdvancedStats,
     SupplierCreate, SupplierUpdate, SupplierResponse,
@@ -1273,6 +1273,78 @@ def update_cash_opening(
     return opening
 
 CASH_CLOSING_DIFFERENCE_THRESHOLD = Decimal(os.environ.get("CASH_CLOSING_THRESHOLD", "50000"))
+
+@router.get("/cash-closings/preview/{opening_id}", response_model=CashClosingPreview)
+def preview_cash_closing(
+    opening_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller_or_admin)
+):
+    from zoneinfo import ZoneInfo
+    colombia_tz = ZoneInfo("America/Bogota")
+    now_colombia = datetime.now(colombia_tz)
+    
+    opening = db.query(CashOpening).filter(CashOpening.id == opening_id).first()
+    if not opening:
+        raise HTTPException(status_code=404, detail="No se encontró la apertura de caja especificada")
+    
+    existing = db.query(CashClosing).filter(CashClosing.opening_id == opening_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe un cierre para esta apertura")
+    
+    store_register_ids = db.query(CashRegister.id).filter(
+        CashRegister.store_id == opening.store_id,
+        CashRegister.deleted_at == None
+    ).subquery()
+    
+    total_sales = db.query(func.coalesce(func.sum(Sale.total), 0)).filter(
+        Sale.store_id == opening.store_id,
+        Sale.deleted_at == None,
+        Sale.created_at >= opening.opening_date,
+        Sale.created_at <= now_colombia
+    ).scalar()
+    
+    total_cash_sales = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+        Payment.payment_method == "efectivo",
+        Payment.is_refund == False,
+        Payment.deleted_at == None,
+        Payment.cash_register_id.in_(store_register_ids),
+        Payment.created_at >= opening.opening_date,
+        Payment.created_at <= now_colombia
+    ).scalar()
+    
+    total_expenses = db.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
+        Expense.store_id == opening.store_id,
+        Expense.deleted_at == None,
+        Expense.created_at >= opening.opening_date,
+        Expense.created_at <= now_colombia
+    ).scalar()
+    
+    total_transfers_in = db.query(func.coalesce(func.sum(CashTransfer.amount), 0)).filter(
+        CashTransfer.to_register_id.in_(store_register_ids),
+        CashTransfer.created_at >= opening.opening_date,
+        CashTransfer.created_at <= now_colombia
+    ).scalar()
+    
+    total_transfers_out = db.query(func.coalesce(func.sum(CashTransfer.amount), 0)).filter(
+        CashTransfer.from_register_id.in_(store_register_ids),
+        CashTransfer.created_at >= opening.opening_date,
+        CashTransfer.created_at <= now_colombia
+    ).scalar()
+    
+    initial_balance = float(opening.initial_balance)
+    expected_balance = initial_balance + float(total_cash_sales) - float(total_expenses) + float(total_transfers_in) - float(total_transfers_out)
+    
+    return CashClosingPreview(
+        opening_id=opening_id,
+        initial_balance=initial_balance,
+        total_sales=float(total_sales),
+        total_cash_sales=float(total_cash_sales),
+        total_expenses=float(total_expenses),
+        total_transfers_in=float(total_transfers_in),
+        total_transfers_out=float(total_transfers_out),
+        expected_balance=expected_balance
+    )
 
 @router.post("/cash-closings", response_model=CashClosingResponse)
 def create_cash_closing(

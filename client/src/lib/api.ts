@@ -298,6 +298,10 @@ class ApiClient {
     return this.request<CashClosing[]>(`/cash-closings?${params}`);
   }
 
+  async getCashClosingPreview(openingId: number) {
+    return this.request<CashClosingPreview>(`/cash-closings/preview/${openingId}`);
+  }
+
   async updateCashClosing(closingId: number, data: { actual_balance?: number; notes?: string }) {
     return this.request<CashClosing>(`/cash-closings/${closingId}`, {
       method: 'PUT',
@@ -874,6 +878,17 @@ export interface CashClosingCreate {
   store_id: number;
   actual_balance: number;
   notes?: string;
+}
+
+export interface CashClosingPreview {
+  opening_id: number;
+  initial_balance: number;
+  total_sales: number;
+  total_cash_sales: number;
+  total_expenses: number;
+  total_transfers_in: number;
+  total_transfers_out: number;
+  expected_balance: number;
 }
 
 export interface ClosingFilters {
