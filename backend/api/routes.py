@@ -1555,6 +1555,20 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
     
+    # Find active opening (without closing) for "today" stats
+    current_opening_date = None
+    if store_id:
+        # Get the latest opening for this store that doesn't have a closing
+        active_opening = db.query(CashOpening).outerjoin(
+            CashClosing, CashOpening.id == CashClosing.opening_id
+        ).filter(
+            CashOpening.store_id == store_id,
+            CashClosing.id == None
+        ).order_by(CashOpening.opening_date.desc()).first()
+        
+        if active_opening:
+            current_opening_date = active_opening.opening_date
+    
     sales_query = db.query(func.coalesce(func.sum(Sale.total), 0))
     expenses_query = db.query(func.coalesce(func.sum(Expense.amount), 0))
     sales_count_query = db.query(func.count(Sale.id))
@@ -1564,15 +1578,22 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
         expenses_query = expenses_query.filter(Expense.store_id == store_id)
         sales_count_query = sales_count_query.filter(Sale.store_id == store_id)
     
-    total_sales_today = sales_query.filter(func.date(Sale.created_at) == today).scalar()
+    # Use opening date if available, otherwise use today's date
+    if current_opening_date:
+        total_sales_today = sales_query.filter(Sale.created_at >= current_opening_date).scalar()
+        total_expenses_today = expenses_query.filter(Expense.created_at >= current_opening_date).scalar()
+        sales_count_today = sales_count_query.filter(Sale.created_at >= current_opening_date).scalar()
+    else:
+        total_sales_today = Decimal('0')
+        total_expenses_today = Decimal('0')
+        sales_count_today = 0
+    
     total_sales_week = sales_query.filter(Sale.created_at >= week_ago).scalar()
     total_sales_month = sales_query.filter(Sale.created_at >= month_ago).scalar()
     
-    total_expenses_today = expenses_query.filter(func.date(Expense.created_at) == today).scalar()
     total_expenses_week = expenses_query.filter(Expense.created_at >= week_ago).scalar()
     total_expenses_month = expenses_query.filter(Expense.created_at >= month_ago).scalar()
     
-    sales_count_today = sales_count_query.filter(func.date(Sale.created_at) == today).scalar()
     sales_count_week = sales_count_query.filter(Sale.created_at >= week_ago).scalar()
     sales_count_month = sales_count_query.filter(Sale.created_at >= month_ago).scalar()
     
@@ -1585,7 +1606,10 @@ def get_dashboard_stats(store_id: Optional[int] = None, db: Session = Depends(ge
     if store_id:
         cost_base_query = cost_base_query.filter(Sale.store_id == store_id)
     
-    cost_today = Decimal(str(cost_base_query.filter(func.date(Sale.created_at) == today).scalar() or 0))
+    if current_opening_date:
+        cost_today = Decimal(str(cost_base_query.filter(Sale.created_at >= current_opening_date).scalar() or 0))
+    else:
+        cost_today = Decimal('0')
     cost_week = Decimal(str(cost_base_query.filter(Sale.created_at >= week_ago).scalar() or 0))
     cost_month = Decimal(str(cost_base_query.filter(Sale.created_at >= month_ago).scalar() or 0))
     

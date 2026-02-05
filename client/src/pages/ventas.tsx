@@ -578,7 +578,7 @@ function VentasContent() {
                         {isNewDay && (
                           <TableRow key={`separator-${sale.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
                             <TableCell colSpan={5} className="py-2">
-                              <span className={`text-xs font-medium capitalize ${!isAdmin ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                              <span className={`text-xs font-medium capitalize ${!isAdmin ? 'text-emerald-500/70' : 'text-emerald-500/80'}`}>
                                 {format(toColombiaTime(sale.created_at), "EEEE, d 'de' MMMM", { locale: es })}
                               </span>
                             </TableCell>
