@@ -536,8 +536,8 @@ function VentasContent() {
                   <TableRow className={!isAdmin ? 'border-slate-700' : ''}>
                     <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Hora</TableHead>
                     <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Productos</TableHead>
-                    <TableHead className={`text-right ${!isAdmin ? 'text-slate-400' : ''}`}>Total</TableHead>
-                    <TableHead className={!isAdmin ? 'text-slate-400' : ''}>Método de Pago</TableHead>
+                    <TableHead className={`text-center ${!isAdmin ? 'text-slate-400' : ''}`}>Total</TableHead>
+                    <TableHead className={`text-center ${!isAdmin ? 'text-slate-400' : ''}`}>Método de Pago</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -559,15 +559,15 @@ function VentasContent() {
                     
                     return (
                       <TableRow key={sale.id} data-testid={`row-sale-${sale.id}`} className={!isAdmin ? 'border-slate-700' : ''}>
-                        <TableCell className={!isAdmin ? 'text-slate-300' : ''}>{format(new Date(sale.created_at), "HH:mm", { locale: es })}</TableCell>
+                        <TableCell className={!isAdmin ? 'text-slate-300' : ''}>{format(new Date(sale.created_at), "h:mm a", { locale: es })}</TableCell>
                         <TableCell className={`max-w-[200px] truncate ${!isAdmin ? 'text-white' : ''}`}>
                           {productsSummary}{hasMore ? ` (+${(sale.items?.length || 0) - 2} más)` : ""}
                         </TableCell>
-                        <TableCell className={`text-right font-bold ${!isAdmin ? 'text-white' : ''}`}>
+                        <TableCell className={`text-center font-bold ${!isAdmin ? 'text-white' : ''}`}>
                           {formatCurrency(sale.total)}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
+                        <TableCell className="text-center">
+                          <div className="flex flex-wrap gap-1 justify-center">
                             {uniqueMethods.map((method, idx) => (
                               <span 
                                 key={idx} 
