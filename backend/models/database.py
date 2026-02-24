@@ -6,6 +6,9 @@ from sqlalchemy.orm import sessionmaker
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL:
+    # Fly.io (y otras plataformas) entregan "postgres://" pero SQLAlchemy requiere "postgresql://"
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     engine = create_engine(DATABASE_URL)
 else:
     engine = create_engine("sqlite:///./finanzas.db", connect_args={"check_same_thread": False})

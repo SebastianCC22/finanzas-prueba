@@ -5,7 +5,27 @@ server/public
 vite.config.ts.*
 *.tar.gz
 
+# Variables de entorno — NUNCA subir al repo
 .env
+.env.local
+.env.*.local
+
+# Python
 venv/
+backend/venv/
 .local/
 __pycache__
+**/__pycache__
+*.pyc
+*.pyo
+
+# Base de datos local
+finanzas.db
+*.db
+
+# Backups generados
+backups/
+logs/
+
+# Archivos Python auxiliares no necesarios en el repo
+uv.lock
