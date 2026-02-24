@@ -1,37 +1,23 @@
-# fly.toml — Finanzas Rincón Integral
-# app = 'finanzas-prueba' generado por fly launch — no cambiar
+# fly.toml app configuration file generated for finanzas-prueba on 2026-02-24T15:54:32Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
 app = 'finanzas-prueba'
-primary_region = 'lax'
+primary_region = 'gru'
 
 [build]
-  dockerfile = "Dockerfile"
 
 [http_service]
-  internal_port = 5000
+  internal_port = 8080
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
   processes = ['app']
-
-  [http_service.concurrency]
-    type = "connections"
-    hard_limit = 25
-    soft_limit = 20
-
-[env]
-  NODE_ENV = "production"
-  PORT = "5000"
 
 [[vm]]
   memory = '1gb'
   cpu_kind = 'shared'
   cpus = 1
-
-# Volumen persistente para backups SQL (1 GB gratis en Fly.io)
-# Créalo antes del primer deploy:
-#   fly volumes create finanzas_backups --region lax --size 1
-[[mounts]]
-  source = "finanzas_backups"
-  destination = "/app/backups"
+  memory_mb = 1024
