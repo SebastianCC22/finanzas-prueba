@@ -1,5 +1,5 @@
 #!/bin/bash
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+backend/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 echo "Backend started with PID: $BACKEND_PID"
 

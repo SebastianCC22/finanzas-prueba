@@ -8,7 +8,7 @@ const app = express();
 const httpServer = createServer(app);
 
 const backendEnv = Object.assign({}, process.env, { PYTHONDONTWRITEBYTECODE: "1" });
-const backendProcess = spawn("python", ["-B", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"], {
+const backendProcess = spawn("backend/venv/bin/python", ["-B", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"], {
   stdio: ["inherit", "inherit", "inherit"],
   detached: false,
   env: backendEnv
