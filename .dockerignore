@@ -22,7 +22,6 @@ backups/
 *.md
 generate_docs.py
 main.py
-script/
 migrations/
 vite.config.ts.*
 *.tar.gz
